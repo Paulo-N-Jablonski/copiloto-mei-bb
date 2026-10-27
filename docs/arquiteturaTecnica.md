@@ -62,8 +62,8 @@
   * Histograma diário: `[Hoje: 900, Sexta: 1200, Sábado: 1100, Domingo: 0, Segunda: 400, Terça: 500, Quarta: 850]`.
 * **Alerta Crítico de Risco de Caixa (Card Amarelo):**
   * Gatilho: `total_saidas_semana > total_entradas_semana`.
-  * Mensagem dinâmica: `"Suas saídas previstas superam as entradas em R$ 2.150,00 na próxima semana."`
-  * Cálculo: $7.750,00 - 4.950,00 = 2.150,00$.
+  * Mensagem dinâmica: `"Suas saídas previstas superam as entradas em R$ 2.800,00 na próxima semana."`
+  * Cálculo: $7.750,00 - 4.950,00 = 2.800,00$.
 * **Barra de Navegação Inferior:** `[Início, Contas, Agenda, Copiloto (Badge ativo), Perfil]`.
 
 ### 2.2. Tela 2: CopilotoMEI (`Screen_Copiloto`)
@@ -73,7 +73,7 @@
   * Item 2: `Antecipar recebíveis` $\to$ Subtexto: `"Você tem R$ 3.200,00 disponíveis"` | Valor: `R$ 3.200,00`.
   * Item 3: `Aplicar saldo disponível` $\to$ Subtexto: `"Rendimento estimado de 120% do CDI"` | Valor: `R$ 7.985,32`.
 * **Card Operacional "Risco de Caixa Identificado" (Ação 1-Clique):**
-  * Diagnóstico: `"Na próxima semana, suas saídas previstas podem superar suas entradas em R$ 2.150,00."`
+  * Diagnóstico: `"Na próxima semana, suas saídas previstas podem superar suas entradas em R$ 2.800,00."`
   * Botão Secundário: `Ver solução` (Exibe composição analítica do Agente Estrategista).
   * Botão Primário de Ação: `Autorizar com biometria` (Dispara biometria local e executa Agente 4).
 * **Capacidades em Destaque:**

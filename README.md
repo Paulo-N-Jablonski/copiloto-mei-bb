@@ -20,6 +20,8 @@ Esta solução implementa um **Copiloto de Saúde Financeira** baseado em IA Ag�
 | Boletos fraudulentos / adulterados | Guardrail antifraude com validação CNPJ em tempo real |
 | Desconfiança em ações autônomas | Human-in-the-Loop: 100% das transações exigem biometria |
 
+> **Nota:** O hiato financeiro calculado pelo Agente 3 é **R$ 2.800,00** (R$ 7.750,00 − R$ 4.950,00), valor que prevalece sobre R$ 2.150,00 mencionado nas telas de mockup de referência.
+
 ---
 
 ## Topologia Multiagente
@@ -325,26 +327,6 @@ cp .env.example .env
 | `WATSONX_URL` | `https://us-south.ml.cloud.ibm.com` | Endpoint regional watsonx.ai |
 | `WATSONX_PROJECT_ID` | — | Project ID watsonx.ai |
 | `WATSONX_MODEL_ID` | `meta-llama/llama-3-3-70b-instruct` | Modelo IBM (fallback automático para Granite quando disponível) |
-
----
-
-## Nota Técnica — Cálculo do Déficit Financeiro (Hiato G)
-
-O valor do déficit exibido na interface de referência (`docs/telaInicio.jpeg`) mostra **R$ 2.150,00**, enquanto o Agente 3 — Estrategista calcula e persiste **R$ 2.800,00**. Esta divergência é intencional e documentada:
-
-| Origem | Valor | Descrição |
-|---|---|---|
-| UI de referência (`docs/*.jpeg`) | R$ 2.150,00 | Valor visual ilustrativo das telas de mockup |
-| Agente 3 — fórmula `G = saídas − receitas` | **R$ 2.800,00** | `7.750,00 − 4.950,00 = 2.800,00` (correto matematicamente) |
-
-O Estrategista Financeiro aplica a fórmula estrita:
-
-```
-G = max(0, total_saidas − total_receitas)
-G = max(0, 7.750,00 − 4.950,00) = R$ 2.800,00
-```
-
-Este é o valor propagado em todos os contratos do sistema (ExecutionPlan, BFF, guardrail, Saga), garantindo consistência auditável pelo **watsonx.governance**. O valor R$ 2.150,00 das telas de mockup **não é processado em nenhuma camada de código** e não interfere nas validações.
 
 ---
 
