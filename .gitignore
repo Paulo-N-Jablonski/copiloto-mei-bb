@@ -1,0 +1,36 @@
+# ── Segredos e variáveis de ambiente ─────────────────────────────────────────
+.env
+*.env
+.env.*
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── pytest / coverage ─────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Node.js / TypeScript ──────────────────────────────────────────────────────
+node_modules/
+src/mcp-server/build/
+
+# ── Logs e PIDs ───────────────────────────────────────────────────────────────
+logs/
+*.log
+*.pid
+
+# ── Sistema ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

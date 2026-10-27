@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: BB Copiloto MEI - Core Engine Tools
+  version: 1.0.0
+  description: |
+    Especificação OpenAPI 3.0 das 4 tools expostas pelo servidor MCP do Copiloto MEI
+    Banco do Brasil. Este arquivo é importado como Skills no IBM watsonx Orchestrate,
+    tornando cada endpoint uma tool invocável pelo Agente 1 (Orquestrador).
+
+    **Topologia de consumo:**
+    - `validateCpfCnpjBinding` → Agente 1 (Onboarding / Screen_Register)
+    - `getDashboardState`       → Agente 2 → Agente 1 (Screen_Dashboard)
+    - `auditModelOutput`        → Agente 5 (Guardrail watsonx.governance)
+    - `executeFinancialSaga`    → Agente 4 (Saga Engine, requer token biométrico FIDO2)
+  contact:
+    name: IBM Experiential Learning Lab — Banco do Brasil
+    url: https://bb.com.br/copiloto-mei
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor MCP local (stdio transport — URL usada apenas para documentação OpenAPI)
+
+paths:
+  /tools/onboarding/validate-cpf-cnpj:
+    post:
+      operationId: validateCpfCnpjBinding
+      summary: Valida vínculo entre CNPJ ativo e CPF mascarado via BrasilAPI
+      description: |
+        Consulta a API pública da Receita Federal via BrasilAPI
+        (`GET https://brasilapi.com.br/api/cnpj/v1/{cnpj}`) e verifica:
+        1. Se `situacao_cadastral == 2` (ATIVA). Rejeita qualquer outro valor.
+        2. Se a máscara de CPF fornecida (`***{cpf[3:9]}**`) coincide com o quadro
+           societário ou razão social retornado pela BrasilAPI.
+        Invocado durante o onboarding (Screen_Register) antes de persistir o cadastro.
+      tags:
+        - Onboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nome_completo
+                - cpf
+                - cnpj
+              additionalProperties: false
+              properties:
+                nome_completo:
+                  type: string
+                  description: Nome completo do titular conforme cadastro.
+                  example: "João Silva"
+                cpf:
+                  type: string
+                  description: CPF do titular sem formatação (apenas dígitos).
+                  pattern: '^\d{11}$'
+                  example: "12345678901"
+                cnpj:
+                  type: string
+                  description: CNPJ da empresa MEI sem formatação (apenas dígitos).
+                  pattern: '^\d{14}$'
+                  example: "11222333000181"
+      responses:
+        '200':
+          description: Validação concluída. Verificar campo `valido` para o resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidacaoCpfCnpjResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tools/finance/get-dashboard-state:
+    get:
+      operationId: getDashboardState
+      summary: Obtém o estado financeiro consolidado do MEI para o dashboard
+      description: |
+        Retorna o payload `CanonicalFinancialState` completo para o MEI identificado.
+        Inclui saldos consolidados via Open Finance, agenda de contas a vencer nos
+        próximos 7 dias, histograma de receitas previstas e diagnóstico de risco de caixa.
+        Produzido pelo Agente 2 (Agregador) e exibido na Screen_Dashboard.
+      tags:
+        - Finance
+      parameters:
+        - name: mei_id
+          in: query
+          required: true
+          description: Identificador único do MEI no sistema BB. Formato UUID v4.
+          schema:
+            type: string
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        '200':
+          description: Estado financeiro consolidado retornado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanonicalFinancialState'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tools/governance/audit-output:
+    post:
+      operationId: auditModelOutput
+      summary: Valida output do modelo contra guardrails anti-alucinação numérica
+      description: |
+        Executa validação de guardrail no watsonx.governance comparando os valores
+        monetários presentes no texto gerado pelo LLM com os valores calculados no
+        `ExecutionPlan`. Usa regex `R\$\s?(\d{1,3}(\.\d{3})*,\d{2})` para extrair
+        entidades numéricas do texto e verifica correspondência exata com os nós do
+        plano. Se divergir, aborta e emite template determinístico. Invocado pelo
+        Agente 5 (Guardião) antes de qualquer resposta ser exibida ao usuário.
+      tags:
+        - Governance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - texto_gerado
+                - plano_calculado
+              additionalProperties: false
+              properties:
+                texto_gerado:
+                  type: string
+                  description: Texto em linguagem natural gerado pelo modelo Granite para exibição ao usuário.
+                  example: "Identifiquei um déficit de R$ 2.150,00. Recomendo resgatar R$ 985,32 da poupança."
+                plano_calculado:
+                  type: object
+                  description: ExecutionPlan serializado gerado pelo Agente 3 (Estrategista Financeiro).
+                  example:
+                    status: "PLANO_ESTRUTURADO"
+                    hiato_total: 2150.00
+                    custo_solucao: 0.58
+      responses:
+        '200':
+          description: Resultado da auditoria de guardrail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditOutputResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tools/execution/execute-saga:
+    post:
+      operationId: executeFinancialSaga
+      summary: Executa encadeamento atômico Saga sob token biométrico FIDO2
+      description: |
+        Dispara a execução transacional atômica no Core BB via padrão Saga:
+        **Resgate → Antecipação → Liquidação**. Requer token biométrico FIDO2
+        assinado (TTL = 120 segundos) gerado pelo app BB após confirmação via
+        FaceID ou digital. Em caso de falha no passo de liquidação, o Agente 4
+        executa rollback compensatório automático (estorno de antecipação e
+        reaplicação em poupança). Emite recibo consolidado único.
+      tags:
+        - Execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - biometric_token
+                - execution_plan_id
+              additionalProperties: false
+              properties:
+                biometric_token:
+                  type: string
+                  description: Token criptográfico FIDO2 assinado pelo dispositivo do usuário. TTL de 120 segundos. Nenhuma transação financeira ocorre sem este token.
+                  example: "eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtZWlfMTIzIiwiZXhwIjoxNzAwMDAwMTIwfQ.signature"
+                execution_plan_id:
+                  type: string
+                  description: Identificador do ExecutionPlan gerado pelo Agente 3. Referenciado em diagnostico_risco.acao_recomendada_id.
+                  example: "ACT-2026-W43-01"
+      responses:
+        '200':
+          description: Saga executada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteSagaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Token biométrico expirado ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    CanonicalFinancialState:
+      $ref: './schemas/canonical-financial-state.json'
+
+    ValidacaoCpfCnpjResponse:
+      type: object
+      required:
+        - valido
+        - motivo
+      additionalProperties: false
+      properties:
+        valido:
+          type: boolean
+          description: True se o CNPJ está ativo e o CPF é compatível com o quadro societário.
+          example: true
+        motivo:
+          type: string
+          description: Descrição do resultado da validação ou motivo de rejeição.
+          example: "CNPJ ativo e CPF vinculado ao quadro societário confirmado."
+
+    AuditOutputResponse:
+      type: object
+      required:
+        - aprovado
+        - divergencias
+      additionalProperties: false
+      properties:
+        aprovado:
+          type: boolean
+          description: True se todos os valores monetários do texto coincidem com o ExecutionPlan. False aciona o template determinístico.
+          example: true
+        divergencias:
+          type: array
+          description: Lista de divergências encontradas entre o texto gerado e o plano calculado. Vazio quando aprovado é true.
+          items:
+            type: string
+          example: []
+
+    ExecuteSagaResponse:
+      type: object
+      required:
+        - sucesso
+        - recibo_consolidado_id
+      additionalProperties: false
+      properties:
+        sucesso:
+          type: boolean
+          description: True se todos os passos da Saga foram executados com sucesso.
+          example: true
+        recibo_consolidado_id:
+          type: string
+          description: Identificador único do recibo consolidado emitido após execução bem-sucedida de todos os passos.
+          example: "REC-2026-W43-001"
+
+    ErrorResponse:
+      type: object
+      required:
+        - codigo
+        - mensagem
+      additionalProperties: false
+      properties:
+        codigo:
+          type: string
+          description: Código de erro interno do sistema.
+          example: "BIOMETRIC_TOKEN_EXPIRED"
+        mensagem:
+          type: string
+          description: Descrição legível do erro.
+          example: "O token biométrico expirou. Solicite nova autenticação biométrica no app."
+
+  responses:
+    BadRequest:
+      description: Requisição inválida — campos obrigatórios ausentes ou formato incorreto.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Não autorizado — sessão JWT inválida ou expirada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Erro interno do servidor — falha na integração com Core BB ou Open Finance.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Onboarding
+    description: Ferramentas de validação cadastral e vinculação CPF/CNPJ via BrasilAPI.
+  - name: Finance
+    description: Ferramentas de agregação e consulta do estado financeiro consolidado.
+  - name: Governance
+    description: Ferramentas de guardrail, anti-alucinação e conformidade (watsonx.governance).
+  - name: Execution
+    description: Ferramentas de execução transacional atômica via Saga Pattern no Core BB.

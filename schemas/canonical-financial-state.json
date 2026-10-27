@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bb.com.br/copiloto-mei/schemas/canonical-financial-state.json",
+  "title": "CanonicalFinancialState",
+  "description": "Estado financeiro consolidado do MEI. Payload canônico que trafega entre todos os agentes do Copiloto MEI. Produzido pelo Agente 2 (Agregador) e consumido pelo Agente 3 (Estrategista) e Agente 1 (Orquestrador).",
+  "type": "object",
+  "required": ["mei_id", "resumo_saldos", "a_vencer_semana", "receita_prevista_7d", "diagnostico_risco"],
+  "additionalProperties": false,
+  "properties": {
+    "mei_id": {
+      "type": "string",
+      "description": "Identificador único do MEI no sistema BB. Formato UUID v4.",
+      "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    },
+    "resumo_saldos": {
+      "type": "object",
+      "description": "Resumo dos saldos financeiros consolidados via Open Finance.",
+      "required": ["saldo_atual", "contas_conectadas", "disponivel"],
+      "additionalProperties": false,
+      "properties": {
+        "saldo_atual": {
+          "type": "number",
+          "description": "Soma de saldos líquidos em todas as contas vinculadas via Open Finance e Core BB.",
+          "minimum": 0,
+          "example": 12456.78
+        },
+        "contas_conectadas": {
+          "type": "integer",
+          "description": "Total de instituições financeiras sincronizadas via consentimento Open Finance.",
+          "minimum": 0,
+          "example": 3
+        },
+        "disponivel": {
+          "type": "number",
+          "description": "Saldo passível de movimentação imediata, excluindo valores comprometidos ou bloqueados. Exibido na Screen_Dashboard como 'Disponível'.",
+          "minimum": 0,
+          "example": 7985.32
+        }
+      }
+    },
+    "a_vencer_semana": {
+      "type": "object",
+      "description": "Compromissos financeiros com vencimento nos próximos 7 dias, capturados via DDA e APIs Core BB.",
+      "required": ["total", "itens"],
+      "additionalProperties": false,
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Soma acumulada de todos os compromissos a vencer na semana. Gatilho de alerta quando total > receita_prevista_7d.total.",
+          "minimum": 0,
+          "example": 7750.00
+        },
+        "itens": {
+          "type": "array",
+          "description": "Lista detalhada de cada compromisso a vencer.",
+          "items": {
+            "type": "object",
+            "required": ["id", "descricao", "valor", "dias_para_vencimento", "cnpj_beneficiario", "tipo"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Identificador único do compromisso no sistema BB.",
+                "example": "COMP-2026-001"
+              },
+              "descricao": {
+                "type": "string",
+                "description": "Descrição legível do compromisso exibida na UI.",
+                "example": "cartão de crédito"
+              },
+              "valor": {
+                "type": "number",
+                "description": "Valor em reais do compromisso.",
+                "minimum": 0.01,
+                "example": 1250.00
+              },
+              "dias_para_vencimento": {
+                "type": "integer",
+                "description": "Número de dias corridos até o vencimento a partir da data atual. Zero indica vencimento hoje.",
+                "minimum": 0,
+                "example": 3
+              },
+              "cnpj_beneficiario": {
+                "type": "string",
+                "description": "CNPJ do beneficiário do pagamento. Usado pelo Agente 5 para validação antifraude.",
+                "pattern": "^\\d{14}$",
+                "example": "11222333000181"
+              },
+              "tipo": {
+                "type": "string",
+                "description": "Categoria do compromisso financeiro. CARTAO = fatura de cartão de crédito; BOLETO_DDA = boleto capturado via Débito Direto Autorizado; DAS_MEI = Documento de Arrecadação do Simples Nacional MEI; CONTA_CONSUMO = contas de utilidades (energia, água, telefone).",
+                "enum": ["CARTAO", "BOLETO_DDA", "DAS_MEI", "CONTA_CONSUMO"],
+                "example": "CARTAO"
+              }
+            }
+          },
+          "minItems": 0
+        }
+      }
+    },
+    "receita_prevista_7d": {
+      "type": "object",
+      "description": "Recebíveis confirmados para os próximos 7 dias, provenientes de Pix, POS e ordens de pagamento agendadas.",
+      "required": ["total", "histograma"],
+      "additionalProperties": false,
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Soma total de recebíveis confirmados nos próximos 7 dias. Comparado com a_vencer_semana.total para calcular o déficit.",
+          "minimum": 0,
+          "example": 4950.00
+        },
+        "histograma": {
+          "type": "array",
+          "description": "Distribuição diária dos recebíveis nos próximos 7 dias. Exibido como gráfico de barras na Screen_Dashboard.",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "required": ["dia_rotulo", "valor"],
+            "additionalProperties": false,
+            "properties": {
+              "dia_rotulo": {
+                "type": "string",
+                "description": "Rótulo do dia exibido no eixo X do histograma.",
+                "enum": ["Hoje", "Sexta", "Sábado", "Domingo", "Segunda", "Terça", "Quarta"],
+                "example": "Hoje"
+              },
+              "valor": {
+                "type": "number",
+                "description": "Valor total de recebíveis previstos neste dia.",
+                "minimum": 0,
+                "example": 900.00
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostico_risco": {
+      "type": "object",
+      "description": "Diagnóstico de risco de caixa calculado pelo Agente 3 (Estrategista Financeiro). Alimenta o alerta amarelo na Screen_Dashboard e o card de ação na Screen_Copiloto.",
+      "required": ["risco_identificado", "defice_semana", "acao_recomendada_id"],
+      "additionalProperties": false,
+      "properties": {
+        "risco_identificado": {
+          "type": "boolean",
+          "description": "True quando a_vencer_semana.total > receita_prevista_7d.total, indicando risco de ruptura de caixa na semana.",
+          "example": true
+        },
+        "defice_semana": {
+          "type": "number",
+          "description": "Valor absoluto do déficit semanal. Calculado como max(0, a_vencer_semana.total - receita_prevista_7d.total). Exibido no alerta: 'R$ 2.150,00 na próxima semana'.",
+          "minimum": 0,
+          "example": 2150.00
+        },
+        "acao_recomendada_id": {
+          "type": "string",
+          "description": "Identificador do ExecutionPlan gerado pelo Agente 3 para cobertura do déficit via cascata Reserva → Antecipação → Microcrédito.",
+          "example": "ACT-2026-W43-01"
+        }
+      }
+    }
+  }
+}

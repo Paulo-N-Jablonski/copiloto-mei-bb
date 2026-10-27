@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Copiloto MEI — Banco do Brasil</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bb: { dark: '#002060', mid: '#0038A8', light: '#1A56DB' },
+            brand: { DEFAULT: '#3B0086', soft: '#4A0EBF' },
+            gold: { DEFAULT: '#FFCC00', soft: '#FEF08A' },
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { background:#f0f4ff; font-family:'Inter',sans-serif; }
+    .sidebar { width:220px; background:linear-gradient(180deg,#002060 0%,#0038A8 60%,#1A56DB 100%); min-height:100vh; }
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#c7d2fe;border-radius:3px}
+    .card { background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,38,168,.07); transition:box-shadow .2s; }
+    .card:hover { box-shadow:0 6px 22px rgba(0,38,168,.13); }
+    .chart-wrap { position:relative; height:170px; }
+    .modal-bd { background:rgba(0,0,0,.55); backdrop-filter:blur(4px); }
+    .bio-ring  { border:3px solid #0038A8; border-radius:50%; animation:spin 2s linear infinite; }
+    .bio-ring2 { border-color:#FFCC00; animation:spin 3s linear infinite reverse; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    /* Nav items da sidebar */
+    .nav-item { color:#bfdbfe !important; transition:all .15s ease; border-right:3px solid transparent; }
+    .nav-item svg { color:#bfdbfe; transition:color .15s ease; }
+    .nav-item:hover { background:rgba(255,255,255,.1); color:#ffffff !important; }
+    .nav-item:hover svg { color:#ffffff; }
+    .nav-item.active { background:rgba(255,255,255,.18) !important; color:#ffffff !important; border-right:3px solid #FFCC00 !important; }
+    .nav-item.active svg { color:#ffffff !important; }
+    .btn-p { background:#0038A8; color:#fff; border-radius:10px; padding:.65rem 1.4rem; font-weight:600; transition:background .15s,transform .1s; }
+    .btn-p:hover { background:#002060; transform:translateY(-1px); }
+    .btn-o { border:2px solid #0038A8; color:#0038A8; border-radius:10px; padding:.62rem 1.4rem; font-weight:600; background:#fff; transition:all .15s; }
+    .btn-o:hover { background:#0038A8; color:#fff; }
+    .acao-row { border-bottom:1px solid #f0f4ff; transition:background .12s; }
+    .acao-row:last-child { border-bottom:none; }
+    .acao-row:hover { background:#f8faff; }
+    /* chat */
+    .chat-bubble-bot  { background:#f0f4ff; border-radius:16px 16px 16px 4px; max-width:82%; }
+    .chat-bubble-user { background:#0038A8; color:#fff; border-radius:16px 16px 4px 16px; max-width:82%; margin-left:auto; }
+    .chip { border:1.5px solid #0038A8; color:#0038A8; border-radius:20px; padding:.3rem .85rem; font-size:.75rem; cursor:pointer; white-space:nowrap; background:#fff; transition:all .15s; }
+    .chip:hover { background:#0038A8; color:#fff; }
+    #chat-messages { height:380px; overflow-y:auto; scroll-behavior:smooth; }
+    .saga-step.done    { color:#059669; }
+    .saga-step.active  { color:#0038A8; font-weight:600; }
+    .saga-step.pending { color:#9ca3af; }
+    .pulse-dot { animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .skeleton { background:linear-gradient(90deg,#e0e7ff 25%,#c7d2fe 50%,#e0e7ff 75%); background-size:200% 100%; animation:sk 1.4s infinite; border-radius:8px; height:18px; }
+    @keyframes sk { from{background-position:200% 0} to{background-position:-200% 0} }
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ───────────────── SIDEBAR ───────────────── -->
+<aside class="sidebar fixed top-0 left-0 h-full flex flex-col z-30 select-none">
+  <div class="px-5 pt-7 pb-5 border-b border-blue-700">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="10" width="8" height="8" rx="1" fill="#FFCC00"/>
+          <rect x="14" y="6" width="8" height="8" rx="1" fill="#FFCC00" opacity=".7"/>
+          <rect x="8" y="14" width="8" height="4" rx="1" fill="#fff" opacity=".9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="text-white font-bold text-sm leading-tight">Banco do Brasil</div>
+        <div class="text-blue-200 text-xs">Copiloto MEI</div>
+      </div>
+    </div>
+    <div class="mt-3 flex items-center gap-2">
+      <span class="bg-gold text-bb-dark text-[10px] font-bold px-2 py-0.5 rounded-full">MEI</span>
+      <span class="flex items-center gap-1 text-emerald-300 text-[10px]">
+        <span class="pulse-dot w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+        API Online
+      </span>
+    </div>
+  </div>
+  <nav class="flex-1 py-4 space-y-1 px-2">
+    <button onclick="setView('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
+      <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><path d="M3 12L12 3l9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
+      Início
+    </button>
+    <button onclick="setView('contas')" id="nav-contas" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
+      <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Contas
+    </button>
+    <button onclick="setView('agenda')" id="nav-agenda" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
+      <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Agenda
+    </button>
+    <button onclick="setView('copiloto')" id="nav-copiloto" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
+      <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M4.93 4.93A10 10 0 0 1 19.07 19.07"/></svg>
+      Copiloto
+    </button>
+    <button onclick="setView('perfil')" id="nav-perfil" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
+      <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Perfil
+    </button>
+  </nav>
+  <div class="px-4 pb-5 text-blue-300 text-[10px] text-center leading-relaxed">
+    <div class="font-semibold text-blue-200 mb-0.5">AI Solutions!</div>
+    <div>CNPJ: 12.345.678/0001-90</div>
+    <div class="mt-1.5 flex items-center justify-center gap-1">
+      <svg width="9" height="9" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      watsonx.governance ativo
+    </div>
+  </div>
+</aside>
+
+<!-- ───────────────── MAIN ───────────────── -->
+<main class="flex-1 ml-[220px] min-h-screen">
+
+  <!-- TOP BAR -->
+  <header class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-indigo-100 px-8 py-3 flex items-center justify-between">
+    <div>
+      <h1 class="text-bb-dark font-bold text-lg">Olá, <span class="text-brand">AI Solutions!</span></h1>
+      <p class="text-gray-500 text-xs">Aqui está um resumo das suas finanças</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="last-update" class="text-gray-400 text-xs hidden"></span>
+      <button onclick="refreshAll()" class="flex items-center gap-1.5 text-bb-mid text-xs font-medium hover:text-bb-dark transition-colors">
+        <svg id="refresh-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar
+      </button>
+      <div class="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold">AI</div>
+    </div>
+  </header>
+
+  <!-- ═══════════════ VIEW: DASHBOARD ═══════════════ -->
+  <div id="view-dashboard" class="view-panel p-8">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+      <!-- COL ESQUERDA (2/3) -->
+      <div class="xl:col-span-2 space-y-5">
+
+        <!-- Cards de saldo -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="card p-4" style="background:linear-gradient(135deg,#002060,#0038A8);">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+              <svg width="17" height="17" fill="#fff" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            <div class="text-blue-200 text-xs mb-0.5">saldo atual</div>
+            <div id="val-saldo-atual" class="text-xl font-bold text-white">R$ 12.456,78</div>
+          </div>
+          <div class="card p-4">
+            <div class="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center mb-3">
+              <svg width="17" height="17" fill="none" stroke="#3B0086" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div class="text-gray-500 text-xs mb-0.5">contas conectadas</div>
+            <div id="val-contas" class="text-2xl font-bold text-bb-dark">3</div>
+            <div class="text-gray-400 text-[11px]">Bancos e Carteiras</div>
+          </div>
+          <div class="card p-4 border border-indigo-100">
+            <div class="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center mb-3">
+              <svg width="17" height="17" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="text-gray-500 text-xs mb-0.5">Disponível</div>
+            <div id="val-disponivel" class="text-lg font-bold text-green-700">R$ 7.985,32</div>
+          </div>
+        </div>
+
+        <!-- A vencer nesta semana -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-bb-dark font-bold text-base">A vencer nesta semana</h2>
+            <div class="text-right">
+              <div id="val-total-saidas" class="text-bb-mid font-bold text-lg">R$7.750,00</div>
+              <div class="text-gray-400 text-xs cursor-pointer hover:text-bb-mid transition-colors" onclick="setView('contas')">ver tudo →</div>
+            </div>
+          </div>
+          <div id="lista-contas" class="space-y-1"></div>
+        </div>
+
+        <!-- Histograma -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-1">
+            <div>
+              <h2 class="text-bb-mid font-bold text-sm">Receita prevista</h2>
+              <div class="text-gray-400 text-xs">próximos 7 dias</div>
+            </div>
+            <div id="val-total-receita" class="text-bb-mid font-bold text-lg">R$4.950,00</div>
+          </div>
+          <div class="chart-wrap mt-2">
+            <canvas id="chartReceita"></canvas>
+          </div>
+        </div>
+
+        <!-- Banner alerta -->
+        <div id="banner-alerta" class="rounded-2xl p-4 flex items-center gap-4 hidden" style="background:#FEF08A;border:2px solid #FFCC00;">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#FFCC00;">
+            <svg width="22" height="22" fill="none" stroke="#92400e" stroke-width="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4m0 4h.01"/></svg>
+          </div>
+          <div>
+            <div class="font-bold text-amber-900 text-sm">Atenção à saúde financeira</div>
+            <div id="banner-texto" class="text-amber-800 text-xs mt-0.5"></div>
+          </div>
+        </div>
+
+      </div><!-- /col-esquerda -->
+
+      <!-- COL DIREITA (1/3) — Hub Copiloto -->
+      <div class="xl:col-span-1 space-y-4">
+
+        <!-- Header Copiloto -->
+        <div class="rounded-2xl p-4 text-white" style="background:linear-gradient(135deg,#002060,#3B0086);">
+          <div class="flex items-center gap-2 mb-0.5">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+              <rect x="6" y="10" width="20" height="14" rx="3" fill="#FFCC00"/>
+              <rect x="10" y="14" width="4" height="4" rx="1" fill="#002060"/>
+              <rect x="18" y="14" width="4" height="4" rx="1" fill="#002060"/>
+              <rect x="13" y="20" width="6" height="2" rx="1" fill="#002060"/>
+              <path d="M16 10V6" stroke="#FFCC00" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="16" cy="5" r="2" fill="#FFCC00"/>
+              <path d="M6 17H3M26 17h3" stroke="#FFCC00" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="font-bold text-base">Copiloto<span style="color:#FFCC00;">MEI</span></span>
+          </div>
+          <div class="text-blue-200 text-xs">Sua saúde financeira em dia.</div>
+        </div>
+
+        <!-- Ações recomendadas -->
+        <div class="card p-4">
+          <h3 class="text-bb-dark font-bold text-sm mb-2">Ações recomendadas</h3>
+          <div id="lista-acoes" class="divide-y divide-gray-50"></div>
+        </div>
+
+        <!-- Card risco amarelo -->
+        <div id="card-risco" class="rounded-2xl p-4 hidden" style="background:#FEF08A;border:2px solid #FFCC00;">
+          <div class="flex items-start gap-3 mb-3">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#FFCC00;">
+              <svg width="18" height="18" fill="none" stroke="#92400e" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4m0 4h.01"/></svg>
+            </div>
+            <div>
+              <div class="font-bold text-amber-900 text-sm">Risco de caixa identificado</div>
+              <div id="texto-risco" class="text-amber-800 text-xs mt-0.5 leading-relaxed"></div>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <button onclick="abrirModalSolucao()" class="btn-p w-full text-sm">Ver solução</button>
+            <button onclick="abrirModalBiometria()" class="btn-o w-full text-sm">
+              <span class="flex items-center justify-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v2M7 11V9a5 5 0 0 1 10 0v2"/><rect x="3" y="11" width="18" height="11" rx="2"/></svg>
+                Autorizar com biometria
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Capacidades -->
+        <div class="card p-4">
+          <h3 class="text-bb-dark font-bold text-sm mb-2">O que o Copiloto pode fazer</h3>
+          <div id="lista-capacidades" class="space-y-0.5"></div>
+        </div>
+
+        <!-- Trava -->
+        <div class="rounded-2xl p-3.5 flex items-center gap-2.5" style="background:#FEF08A;border:1.5px solid #FFCC00;">
+          <svg width="19" height="19" fill="none" stroke="#15803d" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span class="text-green-800 text-xs font-semibold">Todas as ações exigem sua confirmação.</span>
+        </div>
+
+        <!-- CTA Chat -->
+        <button onclick="setView('copiloto')" class="w-full rounded-2xl py-3 px-4 flex items-center justify-center gap-2.5 text-white font-bold text-sm hover:opacity-90 transition-opacity" style="background:linear-gradient(135deg,#0038A8,#3B0086);">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Converse com Copiloto<span style="color:#FFCC00;">MEI</span>
+        </button>
+
+      </div>
+    </div><!-- /grid -->
+  </div><!-- /view-dashboard -->
+
+  <!-- ═══════════════ VIEW: CONTAS ═══════════════ -->
+  <div id="view-contas" class="view-panel hidden p-8 space-y-6">
+    <div>
+      <h2 class="text-bb-dark font-bold text-xl mb-1">Contas via Open Finance</h2>
+      <p class="text-gray-400 text-sm">3 instituições conectadas com consentimento ativo</p>
+    </div>
+
+    <!-- Bancos conectados -->
+    <div class="grid grid-cols-3 gap-4">
+      <div class="card p-4 flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center text-2xl" style="background:#FEF08A;">🏦</div>
+        <div>
+          <div class="font-bold text-bb-dark text-sm">Banco do Brasil</div>
+          <div class="text-xs text-green-600 font-medium">● Sincronizado</div>
+          <div class="text-xs text-gray-400">Conta PJ Principal</div>
+        </div>
+      </div>
+      <div class="card p-4 flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center text-2xl" style="background:#f0fdf4;">💳</div>
+        <div>
+          <div class="font-bold text-bb-dark text-sm">Carteira Digital</div>
+          <div class="text-xs text-green-600 font-medium">● Sincronizado</div>
+          <div class="text-xs text-gray-400">Pix & Recebíveis</div>
+        </div>
+      </div>
+      <div class="card p-4 flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center text-2xl" style="background:#eff6ff;">🏢</div>
+        <div>
+          <div class="font-bold text-bb-dark text-sm">Banco Parceiro</div>
+          <div class="text-xs text-green-600 font-medium">● Sincronizado</div>
+          <div class="text-xs text-gray-400">Conta PF vinculada</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela completa de boletos -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-bold text-bb-dark text-sm">Compromissos da semana — todos os 7 boletos</h3>
+        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Antifraude OK
+        </span>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wide">
+            <th class="px-5 py-3 text-left">Descrição</th>
+            <th class="px-4 py-3 text-left">Tipo</th>
+            <th class="px-4 py-3 text-left">Vencimento</th>
+            <th class="px-4 py-3 text-right">Valor</th>
+            <th class="px-4 py-3 text-center">Auditoria</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-boletos" class="divide-y divide-gray-50"></tbody>
+        <tfoot>
+          <tr class="bg-bb-dark text-white">
+            <td colspan="3" class="px-5 py-3 font-bold text-sm">Total a vencer</td>
+            <td id="tfoot-total" class="px-4 py-3 text-right font-bold">R$ 7.750,00</td>
+            <td class="px-4 py-3 text-center text-xs">7/7 ✓</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VIEW: AGENDA ═══════════════ -->
+  <div id="view-agenda" class="view-panel hidden p-8">
+    <div class="max-w-3xl mx-auto space-y-5">
+      <h2 class="font-bold text-bb-dark text-xl">Agenda Financeira</h2>
+      <!-- Resumo semanal -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="card p-5 text-center">
+          <div class="text-2xl font-black text-bb-dark">7</div>
+          <div class="text-xs text-gray-500 mt-1">Compromissos esta semana</div>
+        </div>
+        <div class="card p-5 text-center">
+          <div class="text-2xl font-black text-red-600">R$ 7.750,00</div>
+          <div class="text-xs text-gray-500 mt-1">Total a pagar</div>
+        </div>
+        <div class="card p-5 text-center">
+          <div class="text-2xl font-black text-green-600">R$ 4.950,00</div>
+          <div class="text-xs text-gray-500 mt-1">Receita prevista</div>
+        </div>
+      </div>
+      <!-- Linha do tempo -->
+      <div class="card p-5">
+        <h3 class="font-bold text-bb-dark text-sm mb-4">Próximos vencimentos</h3>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-700 font-black text-sm flex-shrink-0">1d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Internet empresarial</div><div class="text-xs text-gray-500">CONTA_CONSUMO · CNPJ 66.777.888/0001-36</div></div>
+            <div class="text-sm font-bold text-red-600">R$ 2.550,00</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-orange-50 border border-orange-100">
+            <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-black text-sm flex-shrink-0">2d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Plano de saúde</div><div class="text-xs text-gray-500">BOLETO_DDA · Auditado BrasilAPI ✓</div></div>
+            <div class="text-sm font-bold text-orange-700">R$ 534,10</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-yellow-50 border border-yellow-100">
+            <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-800 font-black text-sm flex-shrink-0">3d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Cartão de crédito</div><div class="text-xs text-gray-500">CARTAO · Fatura mensal</div></div>
+            <div class="text-sm font-bold text-yellow-800">R$ 1.250,00</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-yellow-50 border border-yellow-100">
+            <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-800 font-black text-sm flex-shrink-0">4d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Fornecedor papelaria</div><div class="text-xs text-gray-500">BOLETO_DDA · Auditado BrasilAPI ✓</div></div>
+            <div class="text-sm font-bold text-yellow-800">R$ 890,00</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm flex-shrink-0">5d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Aluguel</div><div class="text-xs text-gray-500">BOLETO_DDA · Auditado BrasilAPI ✓</div></div>
+            <div class="text-sm font-bold text-gray-700">R$ 1.800,00</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm flex-shrink-0">6d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">Conta de energia</div><div class="text-xs text-gray-500">CONTA_CONSUMO · Fatura mensal</div></div>
+            <div class="text-sm font-bold text-gray-700">R$ 650,00</div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm flex-shrink-0">7d</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold text-sm text-bb-dark">DAS-MEI</div><div class="text-xs text-gray-500">DAS_MEI · Guia de arrecadação Simples Nacional</div></div>
+            <div class="text-sm font-bold text-gray-700">R$ 75,90</div>
+          </div>
+        </div>
+      </div>
+      <!-- Alerta déficit -->
+      <div class="rounded-xl p-4 flex items-start gap-3" style="background:#FEF9C3;border:1.5px solid #FFCC00;">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" class="flex-shrink-0 mt-0.5"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#92400E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>
+          <div class="font-bold text-amber-900 text-sm">Hiato financeiro de R$ 2.800,00 identificado</div>
+          <div class="text-amber-800 text-xs mt-0.5">Saídas (R$ 7.750,00) superam receitas previstas (R$ 4.950,00). O CopilotoMEI tem um plano de cobertura com custo zero.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VIEW: COPILOTO CHAT ═══════════════ -->
+  <div id="view-copiloto" class="view-panel hidden p-8">
+    <div class="max-w-3xl mx-auto">
+      <!-- Header -->
+      <div class="rounded-2xl p-5 text-white mb-5 flex items-center gap-4" style="background:linear-gradient(135deg,#002060,#3B0086);">
+        <svg width="44" height="44" viewBox="0 0 32 32" fill="none">
+          <rect x="5" y="9" width="22" height="15" rx="3" fill="#FFCC00"/>
+          <rect x="9" y="13" width="4" height="4" rx="1" fill="#002060"/>
+          <rect x="19" y="13" width="4" height="4" rx="1" fill="#002060"/>
+          <rect x="12" y="20" width="8" height="2" rx="1" fill="#002060"/>
+          <path d="M16 9V5" stroke="#FFCC00" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="16" cy="4" r="2.5" fill="#FFCC00"/>
+          <path d="M5 16H2M30 16h-3" stroke="#FFCC00" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <div class="font-bold text-xl">Copiloto<span style="color:#FFCC00;">MEI</span></div>
+          <div class="text-blue-200 text-sm">Assistente financeiro CopilotoMEI · Modelo Cognitivo Ativo</div>
+        </div>
+        <div class="ml-auto text-right">
+          <div class="text-xs text-blue-200 flex items-center gap-1.5">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
+            Online — Conectado
+          </div>
+          <div class="text-xs font-semibold text-gold">Motor Cognitivo Ativo</div>
+        </div>
+      </div>
+
+      <!-- Janela de chat -->
+      <div class="card">
+        <!-- Histórico de mensagens -->
+        <div id="chat-messages" class="p-5 space-y-4"></div>
+
+        <!-- Chips rápidos -->
+        <div id="chips-area" class="px-5 pb-3 flex flex-wrap gap-2"></div>
+
+        <!-- Input -->
+        <div class="px-5 pb-5 flex gap-2">
+          <input id="chat-input"
+            type="text"
+            placeholder="Pergunte sobre seu fluxo de caixa, boletos, crédito…"
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-bb-mid transition-colors"
+            onkeydown="if(event.key==='Enter') enviarMensagem()" />
+          <button onclick="enviarMensagem()" class="btn-p px-4 py-2.5 text-sm flex-shrink-0 flex items-center gap-1.5">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VIEW: PERFIL ═══════════════ -->
+  <div id="view-perfil" class="view-panel hidden p-8">
+    <div class="max-w-2xl mx-auto space-y-5">
+      <h2 class="font-bold text-bb-dark text-xl">Perfil MEI</h2>
+      <!-- Card identidade -->
+      <div class="card p-6 flex items-center gap-5">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black text-white flex-shrink-0" style="background:linear-gradient(135deg,#002060,#3B0086);">AI</div>
+        <div>
+          <div class="font-bold text-bb-dark text-lg">AI Solutions!</div>
+          <div class="text-xs text-gray-500 mt-0.5">CNPJ 12.345.678/0001-99 · MEI ativo</div>
+          <div class="mt-2 flex gap-2">
+            <span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:#DCFCE7;color:#166534;">Situação: ATIVA</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:#DBEAFE;color:#1e40af;">Open Finance: 3 bancos</span>
+          </div>
+        </div>
+      </div>
+      <!-- Dados do MEI -->
+      <div class="card p-6">
+        <h3 class="font-bold text-bb-dark text-sm mb-4">Dados cadastrais</h3>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between py-2 border-b border-gray-100">
+            <span class="text-gray-500">Razão social</span>
+            <span class="font-semibold text-bb-dark">AI SOLUTIONS SERVICOS LTDA</span>
+          </div>
+          <div class="flex justify-between py-2 border-b border-gray-100">
+            <span class="text-gray-500">CPF titular</span>
+            <span class="font-semibold text-bb-dark">***456.789-**</span>
+          </div>
+          <div class="flex justify-between py-2 border-b border-gray-100">
+            <span class="text-gray-500">E-mail</span>
+            <span class="font-semibold text-bb-dark">mei@aisolutions.com.br</span>
+          </div>
+          <div class="flex justify-between py-2 border-b border-gray-100">
+            <span class="text-gray-500">Telefone</span>
+            <span class="font-semibold text-bb-dark">(11) 9 8765-4321</span>
+          </div>
+          <div class="flex justify-between py-2">
+            <span class="text-gray-500">Atividade principal</span>
+            <span class="font-semibold text-bb-dark">Serviços de TI — CNAE 6201-5/01</span>
+          </div>
+        </div>
+      </div>
+      <!-- Segurança FIDO2 -->
+      <div class="card p-6">
+        <h3 class="font-bold text-bb-dark text-sm mb-4">Segurança e autenticação</h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 rounded-xl" style="background:#F0FDF4;">
+            <div class="flex items-center gap-3">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#166534" stroke-width="2" stroke-linejoin="round"/></svg>
+              <div><div class="text-sm font-semibold text-green-800">Biometria FIDO2</div><div class="text-xs text-green-600">Ativa — último uso há 2 min</div></div>
+            </div>
+            <span class="text-xs font-bold text-green-700">●  ON</span>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-xl" style="background:#EFF6FF;">
+            <div class="flex items-center gap-3">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#1d4ed8" stroke-width="2"/><path d="M8 11V7a4 4 0 018 0v4" stroke="#1d4ed8" stroke-width="2"/></svg>
+              <div><div class="text-sm font-semibold text-blue-800">PIN de transações</div><div class="text-xs text-blue-600">4 dígitos configurados</div></div>
+            </div>
+            <span class="text-xs font-bold text-blue-700">●  ON</span>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-xl" style="background:#F9FAFB;">
+            <div class="flex items-center gap-3">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" stroke="#374151" stroke-width="2"/><path d="M6 1v3M10 1v3M14 1v3" stroke="#374151" stroke-width="2" stroke-linecap="round"/></svg>
+              <div><div class="text-sm font-semibold text-gray-700">Notificações push</div><div class="text-xs text-gray-500">Alertas de vencimento ativados</div></div>
+            </div>
+            <span class="text-xs font-bold text-gray-500">●  ON</span>
+          </div>
+        </div>
+      </div>
+      <!-- Consentimento Open Finance -->
+      <div class="card p-6">
+        <h3 class="font-bold text-bb-dark text-sm mb-4">Consentimento Open Finance</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center gap-2 text-green-700"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Banco do Brasil — Conta Corrente PJ e Poupança</div>
+          <div class="flex items-center gap-2 text-green-700"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Nubank — Conta corrente e cartão</div>
+          <div class="flex items-center gap-2 text-green-700"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Mercado Pago — Carteira digital</div>
+          <div class="mt-3 text-xs text-gray-400">Consentimentos válidos por 12 meses · Renovação em 15/06/2026</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════ MODAL: VER SOLUÇÃO ═══════════ -->
+<div id="modal-solucao" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+  <div class="modal-bd absolute inset-0" onclick="fecharModalSolucao()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-7 z-10">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="font-bold text-bb-dark text-xl">Plano de Solução</h2>
+        <div class="text-gray-400 text-xs mt-0.5">Estratégia de menor custo financeiro</div>
+      </div>
+      <button onclick="fecharModalSolucao()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">✕</button>
+    </div>
+    <div class="rounded-xl p-4 mb-4" style="background:#FEF08A;border:1.5px solid #FFCC00;">
+      <div class="text-amber-800 text-xs font-medium mb-1">Hiato financeiro identificado</div>
+      <div id="modal-hiato" class="text-2xl font-black text-amber-900">—</div>
+    </div>
+    <div id="modal-cascata" class="space-y-3 mb-5"></div>
+    <div class="rounded-xl border border-gray-200 overflow-hidden mb-5">
+      <div class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Análise de Custo</div>
+      <div class="grid grid-cols-2 divide-x divide-gray-200">
+        <div class="p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Custo desta solução</div>
+          <div id="modal-custo-solucao" class="text-2xl font-black text-green-700">—</div>
+        </div>
+        <div class="p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Multas/mora evitadas</div>
+          <div id="modal-custo-evitado" class="text-2xl font-black text-bb-dark">—</div>
+        </div>
+      </div>
+    </div>
+    <button onclick="fecharModalSolucaoAutorizar()" class="btn-p w-full text-center text-sm">Autorizar com biometria →</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: BIOMETRIA ═══════════ -->
+<div id="modal-biometria" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+  <div class="modal-bd absolute inset-0" onclick="fecharModalBiometria()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-8 z-10 text-center">
+
+    <!-- Scanner -->
+    <div id="bio-fase-scanner">
+      <h2 class="font-bold text-bb-dark text-xl mb-1">Autenticação Biométrica</h2>
+      <p class="text-gray-400 text-sm mb-7">Aproxime seu rosto ou dedo ao sensor</p>
+      <div class="relative flex items-center justify-center mb-7">
+        <div class="bio-ring w-32 h-32 absolute"></div>
+        <div class="bio-ring2 w-40 h-40 absolute"></div>
+        <div class="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center z-10">
+          <svg width="46" height="46" fill="none" stroke="#0038A8" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v2M7 11V9a5 5 0 0 1 10 0v2"/><rect x="3" y="11" width="18" height="11" rx="2"/><circle cx="12" cy="16" r="1.5" fill="#0038A8"/></svg>
+        </div>
+      </div>
+      <p class="text-gray-400 text-xs" id="bio-hint">Aguardando leitura biométrica…</p>
+      <div class="mt-4 w-full bg-gray-100 rounded-full h-1.5">
+        <div id="bio-progress-bar" class="h-1.5 rounded-full bg-bb-mid transition-all duration-300" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Saga -->
+    <div id="bio-fase-saga" class="hidden">
+      <h2 class="font-bold text-bb-dark text-xl mb-1">Executando Saga</h2>
+      <p class="text-gray-400 text-sm mb-5">Operações encadeadas em progresso…</p>
+      <div class="text-left space-y-4">
+        <div class="saga-step pending flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+          <div><div class="text-sm font-medium">Resgate de Poupança</div><div class="text-xs opacity-60 step-sub">Aguardando…</div></div>
+        </div>
+        <div class="saga-step pending flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+          <div><div class="text-sm font-medium">Antecipação de Recebíveis</div><div class="text-xs opacity-60 step-sub">Aguardando…</div></div>
+        </div>
+        <div class="saga-step pending flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+          <div><div class="text-sm font-medium">Liquidação de Compromissos</div><div class="text-xs opacity-60 step-sub">Aguardando…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recibo -->
+    <div id="bio-fase-recibo" class="hidden">
+      <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+        <svg width="30" height="30" fill="none" stroke="#059669" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2 class="font-bold text-green-700 text-xl mb-1">Transação Concluída!</h2>
+      <p class="text-gray-400 text-xs mb-4">Recibo consolidado gerado com sucesso</p>
+      <div id="recibo-id" class="bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-mono text-gray-600 mb-4 break-all"></div>
+      <div id="recibo-passos" class="text-left space-y-2 mb-4"></div>
+      <button onclick="fecharModalBiometria()" class="btn-p w-full text-sm">Fechar</button>
+    </div>
+
+    <!-- Erro -->
+    <div id="bio-fase-erro" class="hidden">
+      <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+        <svg width="30" height="30" fill="none" stroke="#dc2626" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
+      <h2 class="font-bold text-red-600 text-xl mb-2">Falha na Autenticação</h2>
+      <p id="bio-erro-msg" class="text-gray-400 text-sm mb-4">Não foi possível concluir.</p>
+      <button onclick="fecharModalBiometria()" class="btn-p w-full text-sm">Tentar novamente</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ JAVASCRIPT ═══════════════════════ -->
+<script>
+const S = { dashboard: null, copiloto: null, plano: null };
+const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Chart ────────────────────────────────────────────────────────────────────
+let chart = null;
+function renderChart(hist) {
+  const ctx = document.getElementById('chartReceita').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: hist.map(h => h.dia_rotulo),
+      datasets:[{
+        data: hist.map(h => h.valor),
+        backgroundColor: hist.map(h => h.valor===0 ? '#e0e7ff' : '#3B82F6'),
+        borderRadius:6, borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmt(c.parsed.y)}}},
+      scales:{
+        x:{grid:{display:false}, ticks:{font:{size:10}}},
+        y:{grid:{color:'#f1f5f9'}, ticks:{font:{size:9}, callback:v=> v>=1000?'R$'+(v/1000).toFixed(1)+'k':'R$'+v}}
+      }
+    }
+  });
+}
+
+// ── Ícones ───────────────────────────────────────────────────────────────────
+const tipoIcon = {
+  CARTAO:       '💳',
+  BOLETO_DDA:   '📄',
+  DAS_MEI:      '📍',
+  CONTA_CONSUMO:'⚡',
+};
+const acaoIcon = {
+  ACTION_PAGAR_CONTAS:'📋',
+  ACTION_ANTECIPAR:   '💰',
+  ACTION_APLICAR:     '📈',
+};
+
+// ── Renderiza 3 contas no dashboard ──────────────────────────────────────────
+function renderContas(itens) {
+  const el = document.getElementById('lista-contas');
+  el.innerHTML = itens.slice(0, 3).map(item => {
+    const dias = item.dias_para_vencimento ?? null;
+    const vLabel = dias !== null
+      ? `vencimento em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
+      : (item.vencimento_label || '');
+    const urgente = dias !== null && dias <= 3;
+    return `
+      <div class="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style="background:#FEF08A;">${tipoIcon[item.tipo]||'📄'}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-gray-800 truncate">${item.descricao}</div>
+          <div class="text-xs text-gray-400">${vLabel}</div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="text-bb-mid font-semibold text-sm">${fmt(item.valor)}</div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ${urgente?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${urgente?'Urgente':'OK'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Renderiza tabela completa de boletos ──────────────────────────────────────
+function renderTabelaBoletos(itens) {
+  const tbody = document.getElementById('tabela-boletos');
+  if (!tbody) return;
+  tbody.innerHTML = itens.map(item => {
+    const dias = item.dias_para_vencimento ?? null;
+    const vLabel = dias !== null
+      ? `em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
+      : (item.vencimento_label || '—');
+    const urgente = dias !== null && dias <= 3;
+    const tipoBadgeColor = {
+      CARTAO:'bg-purple-100 text-purple-700',
+      BOLETO_DDA:'bg-blue-100 text-blue-700',
+      DAS_MEI:'bg-orange-100 text-orange-700',
+      CONTA_CONSUMO:'bg-yellow-100 text-yellow-700',
+    };
+    return `
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="px-5 py-3 font-medium text-gray-800">${tipoIcon[item.tipo]||'📄'} ${item.descricao}</td>
+        <td class="px-4 py-3"><span class="text-[11px] px-2 py-0.5 rounded-full font-semibold ${tipoBadgeColor[item.tipo]||'bg-gray-100 text-gray-600'}">${item.tipo}</span></td>
+        <td class="px-4 py-3 text-sm ${urgente?'text-red-600 font-semibold':'text-gray-500'}">${vLabel}</td>
+        <td class="px-4 py-3 text-right font-semibold text-gray-800">${fmt(item.valor)}</td>
+        <td class="px-4 py-3 text-center">
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-0.5">
+            <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Auditado ✓
+          </span>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const totalEl = document.getElementById('tfoot-total');
+  if (totalEl) totalEl.textContent = fmt(itens.reduce((s,i)=>s+i.valor,0));
+}
+
+// ── Renderiza ações recomendadas ──────────────────────────────────────────────
+function renderAcoes(acoes) {
+  const el = document.getElementById('lista-acoes');
+  el.innerHTML = acoes.map(a => `
+    <div class="acao-row flex items-center gap-2.5 py-2.5 px-1 rounded-lg cursor-pointer">
+      <div class="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style="background:#FEF08A;">${acaoIcon[a.id]||'💡'}</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-gray-800">${a.titulo}</div>
+        <div class="text-xs text-gray-400 truncate">${a.subtexto}</div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <div class="text-bb-mid font-bold text-sm">${fmt(a.valor)}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Renderiza capacidades ────────────────────────────────────────────────────
+function renderCapacidades(caps) {
+  const el = document.getElementById('lista-capacidades');
+  const ic  = ['🏛️','📊','🛡️','💳'];
+  el.innerHTML = caps.map((c,i) => `
+    <div class="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 transition-colors">
+      <span class="text-sm w-6">${ic[i%ic.length]}</span>
+      <span class="text-sm text-gray-700 flex-1">${c.titulo}</span>
+      <svg width="11" height="11" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+    </div>`).join('');
+}
+
+// ── Popula dashboard ──────────────────────────────────────────────────────────
+function popularDashboard(d) {
+  const c = d.cards_superiores;
+  document.getElementById('val-saldo-atual').textContent   = fmt(c.saldo_atual.valor);
+  document.getElementById('val-contas').textContent        = c.contas_conectadas.count;
+  document.getElementById('val-disponivel').textContent    = fmt(c.saldo_disponivel.valor);
+  document.getElementById('val-total-saidas').textContent  = fmt(d.a_vencer_semana.total);
+  document.getElementById('val-total-receita').textContent = fmt(d.receita_prevista.total);
+  renderContas(d.a_vencer_semana.itens);
+  renderTabelaBoletos(d.a_vencer_semana.itens);
+  renderChart(d.receita_prevista.histograma);
+  const al = d.alerta_saude_financeira;
+  const bn = document.getElementById('banner-alerta');
+  if (al?.exibir) {
+    document.getElementById('banner-texto').textContent = al.mensagem;
+    bn.classList.remove('hidden');
+  } else bn.classList.add('hidden');
+  S.plano = d.execution_plan_summary;
+}
+
+// ── Popula copiloto ───────────────────────────────────────────────────────────
+function popularCopiloto(c) {
+  renderAcoes(c.acoes_recomendadas);
+  renderCapacidades(c.capacidades);
+  const risco = c.card_risco_caixa;
+  const card  = document.getElementById('card-risco');
+  if (risco?.exibir) {
+    document.getElementById('texto-risco').textContent = risco.diagnostico;
+    card.classList.remove('hidden');
+  } else card.classList.add('hidden');
+}
+
+// ── Fallback ──────────────────────────────────────────────────────────────────
+function fallback() {
+  return {
+    dashboard:{
+      cards_superiores:{
+        saldo_atual:{valor:12456.78},
+        contas_conectadas:{count:3},
+        saldo_disponivel:{valor:7985.32},
+      },
+      a_vencer_semana:{total:7750,
+        itens:[
+          {id:'C1',descricao:'cartão de crédito',   valor:1250,dias_para_vencimento:3,tipo:'CARTAO',cnpj_beneficiario:'11222333000181'},
+          {id:'C2',descricao:'aluguel',              valor:1800,dias_para_vencimento:5,tipo:'BOLETO_DDA',cnpj_beneficiario:'22333444000192'},
+          {id:'C3',descricao:'conta de energia',     valor:650, dias_para_vencimento:6,tipo:'CONTA_CONSUMO',cnpj_beneficiario:'33444555000103'},
+          {id:'C4',descricao:'DAS-MEI',              valor:75.9,dias_para_vencimento:7,tipo:'DAS_MEI',cnpj_beneficiario:'00394460034273'},
+          {id:'C5',descricao:'fornecedor papelaria', valor:890, dias_para_vencimento:4,tipo:'BOLETO_DDA',cnpj_beneficiario:'44555666000114'},
+          {id:'C6',descricao:'plano de saúde',       valor:534.1,dias_para_vencimento:2,tipo:'BOLETO_DDA',cnpj_beneficiario:'55666777000125'},
+          {id:'C7',descricao:'internet empresarial', valor:2550,dias_para_vencimento:1,tipo:'CONTA_CONSUMO',cnpj_beneficiario:'66777888000136'},
+        ]
+      },
+      receita_prevista:{total:4950,histograma:[
+        {dia_rotulo:'Hoje',valor:900},{dia_rotulo:'Sexta',valor:1200},
+        {dia_rotulo:'Sábado',valor:1100},{dia_rotulo:'Domingo',valor:0},
+        {dia_rotulo:'Segunda',valor:400},{dia_rotulo:'Terça',valor:500},{dia_rotulo:'Quarta',valor:850},
+      ]},
+      alerta_saude_financeira:{exibir:true,mensagem:'Suas saídas previstas superam as entradas em R$ 2.800,00 na próxima semana.',defice:2800},
+      execution_plan_summary:{status:'PLANO_ESTRUTURADO',hiato_total:2800,custo_solucao:0,custo_evitado_multas:80.99},
+    },
+    copiloto:{
+      acoes_recomendadas:[
+        {id:'ACTION_PAGAR_CONTAS',titulo:'Pagar contas a vencer',  subtexto:'7 contas nos próximos 7 dias',        valor:7750},
+        {id:'ACTION_ANTECIPAR',  titulo:'Antecipar recebíveis',    subtexto:'Você tem R$ 3.200,00 disponíveis',    valor:3200},
+        {id:'ACTION_APLICAR',    titulo:'Aplicar saldo disponível',subtexto:'Rendimento estimado de 120% do CDI',  valor:7985.32},
+      ],
+      card_risco_caixa:{exibir:true,
+        diagnostico:'Na próxima semana, suas saídas previstas podem superar suas entradas em R$ 2.800,00.',
+        defice:2800, execution_plan_id:'ACT-2026-W43-01',status_plano:'PLANO_ESTRUTURADO',custo_solucao:0,
+      },
+      capacidades:[
+        {titulo:'Consolidar contas via Open Finance',icone:'bank'},
+        {titulo:'Projetar fluxo de caixa',icone:'chart'},
+        {titulo:'Detectar cobranças suspeitas',icone:'shield'},
+        {titulo:'Executar pagamentos autorizados',icone:'card'},
+      ],
+    }
+  };
+}
+
+// ── Fetch BFF ─────────────────────────────────────────────────────────────────
+async function carregarDashboard() {
+  try {
+    const r = await fetch('/api/v1/dashboard/home',{headers:{'x-mei-id':'web-001'}});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    S.dashboard = await r.json();
+    popularDashboard(S.dashboard);
+  } catch(e) {
+    console.warn('[BFF] dashboard fallback:',e.message);
+    const fb = fallback(); popularDashboard(fb.dashboard); S.plano = fb.dashboard.execution_plan_summary;
+  }
+}
+
+async function carregarCopiloto() {
+  try {
+    const r = await fetch('/api/v1/copiloto/summary',{headers:{'x-mei-id':'web-001'}});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    S.copiloto = await r.json();
+    popularCopiloto(S.copiloto);
+  } catch(e) {
+    console.warn('[BFF] copiloto fallback:',e.message);
+    popularCopiloto(fallback().copiloto);
+  }
+}
+
+async function refreshAll() {
+  const ic = document.getElementById('refresh-icon');
+  ic.style.animation = 'spin 1s linear infinite';
+  await Promise.all([carregarDashboard(), carregarCopiloto()]);
+  ic.style.animation = '';
+  const upd = document.getElementById('last-update');
+  upd.textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  upd.classList.remove('hidden');
+}
+
+// ── Navegação ─────────────────────────────────────────────────────────────────
+function setView(name) {
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+  document.getElementById('view-'+name).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('nav-'+name);
+  if (btn) { btn.classList.add('active'); }
+  if (name === 'copiloto') iniciarChat();
+}
+
+// ── Modal Solução ─────────────────────────────────────────────────────────────
+function abrirModalSolucao() {
+  const p = S.plano || {};
+  document.getElementById('modal-hiato').textContent         = p.hiato_total ? fmt(p.hiato_total) : '—';
+  document.getElementById('modal-custo-solucao').textContent = p.custo_solucao !== undefined ? fmt(p.custo_solucao) : '—';
+  document.getElementById('modal-custo-evitado').textContent = p.custo_evitado_multas ? fmt(p.custo_evitado_multas) : '—';
+  document.getElementById('modal-cascata').innerHTML = [
+    {n:1,t:'Reserva / Poupança',          s:'Custo zero — sem encargos',              bg:'#d1fae5',c:'#059669'},
+    {n:2,t:'Antecipação de Recebíveis',   s:'Taxa reduzida BB (0,045% a.d.)',         bg:'#dbeafe',c:'#1d4ed8'},
+    {n:3,t:'Microcrédito Emergencial',    s:'Apenas saldo remanescente — 1,89% a.m.',bg:'#fef3c7',c:'#d97706'},
+  ].map(p=>`
+    <div class="flex items-center gap-3 rounded-xl p-3.5" style="background:${p.bg};">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style="background:${p.c};">${p.n}</div>
+      <div><div class="text-sm font-semibold" style="color:${p.c};">${p.t}</div><div class="text-xs opacity-70">${p.s}</div></div>
+    </div>`).join('');
+  document.getElementById('modal-solucao').classList.remove('hidden');
+}
+function fecharModalSolucao() { document.getElementById('modal-solucao').classList.add('hidden'); }
+function fecharModalSolucaoAutorizar() { fecharModalSolucao(); abrirModalBiometria(); }
+
+// ── Modal Biometria ───────────────────────────────────────────────────────────
+function bioFase(fase) {
+  ['scanner','saga','recibo','erro'].forEach(f => document.getElementById('bio-fase-'+f).classList.add('hidden'));
+  document.getElementById('bio-fase-'+fase).classList.remove('hidden');
+}
+function abrirModalBiometria() {
+  bioFase('scanner');
+  document.getElementById('bio-hint').textContent = 'Aguardando leitura biométrica…';
+  document.getElementById('bio-progress-bar').style.width = '0%';
+  document.getElementById('modal-biometria').classList.remove('hidden');
+  iniciarScanner();
+}
+function fecharModalBiometria() { document.getElementById('modal-biometria').classList.add('hidden'); }
+
+function iniciarScanner() {
+  const msgs = ['Detectando biometria…','Verificando identidade…','Autenticando FIDO2…','Gerando token seguro…','Biometria confirmada ✓'];
+  let pct=0, idx=0;
+  const bar=document.getElementById('bio-progress-bar'), hint=document.getElementById('bio-hint');
+  const t = setInterval(()=>{
+    pct+=20; bar.style.width=pct+'%'; hint.textContent=msgs[idx++];
+    if (pct>=100) { clearInterval(t); setTimeout(executarSaga,600); }
+  },480);
+}
+
+async function executarSaga() {
+  bioFase('saga');
+  const steps = document.querySelectorAll('.saga-step');
+  const animar = async () => {
+    for (let i=0; i<steps.length; i++) {
+      steps[i].classList.replace('pending','active');
+      steps[i].querySelector('.step-sub').textContent='Processando…';
+      await sleep(700);
+      steps[i].classList.replace('active','done');
+      steps[i].querySelector('.step-sub').textContent='Concluído ✓';
+    }
+  };
+  try {
+    const [, resp] = await Promise.all([
+      animar(),
+      fetch('/api/v1/copiloto/authorize-biometrics',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          biometric_token:'TOKEN_BIOMETRIA_MOCK_VALIDO',
+          execution_plan_id: S.copiloto?.card_risco_caixa?.execution_plan_id || 'ACT-2026-W43-01',
+          mei_id:'web-001',
+        }),
+      }).then(r=>r.json()),
+    ]);
+    await sleep(400);
+    const icoMap={RESGATE_POUPANCA:'💰',ANTECIPACAO_RECEBIVEIS:'📈',LIQUIDACAO_COMPROMISSOS:'✅'};
+    document.getElementById('recibo-id').textContent = resp.recibo_consolidado_id||'REC-MOCK-OK';
+    document.getElementById('recibo-passos').innerHTML = (resp.passos_executados||[]).map(p=>`
+      <div class="flex items-center gap-2 text-sm">
+        <span>${icoMap[p.tipo]||'✔️'}</span>
+        <span class="text-gray-700 font-medium">${p.tipo.replace(/_/g,' ')}</span>
+        <span class="ml-auto text-green-700 font-semibold">${p.valor?fmt(p.valor):''}</span>
+      </div>`).join('');
+    bioFase('recibo');
+  } catch(e) {
+    document.getElementById('bio-erro-msg').textContent = e.message||'Erro de conexão.';
+    bioFase('erro');
+  }
+}
+
+// ── Chat Copiloto ─────────────────────────────────────────────────────────────
+let chatIniciado = false;
+const CHIPS_DEFAULT = [
+  'Como economizar R$ 55,20?',
+  'Explique o risco de caixa',
+  'Quais boletos foram auditados?',
+  'Explique a cascata de crédito',
+];
+
+function iniciarChat() {
+  if (chatIniciado) return;
+  chatIniciado = true;
+  const hiato = S.plano?.hiato_total ? fmt(S.plano.hiato_total) : 'R$ 2.800,00';
+  adicionarBolha('bot',
+    `Olá! Sou o **CopilotoMEI** 🤖\n\nAnalisei suas finanças e identifiquei um hiato de **${hiato}** na próxima semana.\n\nTenho um plano de cobertura com **custo zero** usando sua reserva em poupança. Posso te explicar o diagnóstico ou você pode autorizar agora!`
+  );
+  renderChips(CHIPS_DEFAULT);
+}
+
+function adicionarBolha(tipo, texto) {
+  const msgs = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.className = 'flex ' + (tipo==='user' ? 'justify-end' : 'justify-start');
+  const bubble = document.createElement('div');
+  bubble.className = tipo==='bot' ? 'chat-bubble-bot p-4 text-sm text-gray-800' : 'chat-bubble-user p-4 text-sm';
+  // Renderiza ** como bold
+  bubble.innerHTML = texto
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+  div.appendChild(bubble);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function adicionarDigitando() {
+  const msgs = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.id = 'typing-indicator';
+  div.className = 'flex justify-start';
+  div.innerHTML = `<div class="chat-bubble-bot px-4 py-3 flex gap-1.5 items-center">
+    <span class="w-2 h-2 rounded-full bg-bb-mid inline-block" style="animation:pulse 1s infinite"></span>
+    <span class="w-2 h-2 rounded-full bg-bb-mid inline-block" style="animation:pulse 1s .2s infinite"></span>
+    <span class="w-2 h-2 rounded-full bg-bb-mid inline-block" style="animation:pulse 1s .4s infinite"></span>
+  </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removerDigitando() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+function renderChips(chips) {
+  const area = document.getElementById('chips-area');
+  area.innerHTML = chips.map(c =>
+    `<button class="chip" onclick="enviarChip('${c}')">${c}</button>`
+  ).join('');
+}
+
+function enviarChip(texto) {
+  document.getElementById('chat-input').value = texto;
+  enviarMensagem();
+}
+
+async function enviarMensagem() {
+  const input = document.getElementById('chat-input');
+  const msg   = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  document.getElementById('chips-area').innerHTML = '';
+  adicionarBolha('user', msg);
+  adicionarDigitando();
+  try {
+    const r = await fetch('/api/v1/copiloto/chat',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mensagem: msg }),
+    });
+    const data = await r.json();
+    removerDigitando();
+    await sleep(150);
+    adicionarBolha('bot', data.resposta || 'Desculpe, não consegui processar sua pergunta.');
+    if (data.sugestoes?.length) renderChips(data.sugestoes);
+  } catch(e) {
+    removerDigitando();
+    adicionarBolha('bot', `Erro de conexão com o servidor. Por favor, tente novamente.\n_${e.message}_`);
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const fb = fallback();
+  popularDashboard(fb.dashboard);
+  S.plano = fb.dashboard.execution_plan_summary;
+  popularCopiloto(fb.copiloto);
+  refreshAll();
+});
+</script>
+</body>
+</html>

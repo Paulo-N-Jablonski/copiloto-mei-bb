@@ -1,0 +1,28 @@
+{
+  "name": "bb-copiloto-mei-mcp-server",
+  "version": "1.0.0",
+  "description": "Servidor MCP stdio para o Copiloto MEI Banco do Brasil. Expõe as 4 tools core ao IBM watsonx Orchestrate.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && chmod 755 build/index.js",
+    "start": "node build/index.js",
+    "dev": "tsc --watch"
+  },
+  "bin": {
+    "bb-copiloto-mei-mcp": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

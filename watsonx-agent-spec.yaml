@@ -1,0 +1,223 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Manifesto do Agente Copiloto MEI para IBM watsonx Orchestrate
+#
+# Este arquivo define:
+#   1. O modelo de fundação IBM Granite a usar como motor cognitivo.
+#   2. O catálogo de Skills mapeadas a partir do servidor MCP (openapi.yaml).
+#   3. As instruções de sistema (system prompt) do Agente Orquestrador.
+#   4. Os guardrails e políticas de governança (watsonx.governance).
+#
+# Referência:
+#   - docs/arquiteturaTecnica.md seções 1, 5 e 6
+#   - docs/contextoNegocioBB.md seções 5.1 e 5.2
+#   - openapi.yaml (contratos das 4 tools)
+# ──────────────────────────────────────────────────────────────────────────────
+
+agent:
+  name: "CopilotoMEI-BB"
+  description: >
+    Agente Orquestrador do Copiloto de Saúde Financeira para Microempreendedores
+    Individuais (MEIs) do Banco do Brasil. Monitora proativamente o fluxo de caixa,
+    identifica riscos de ruptura semanal, formula planos de menor custo financeiro e
+    executa transações sob autorização biométrica do usuário.
+
+  # ────────────────────────────────────────────────────────────
+  # Motor Cognitivo — IBM Granite via watsonx.ai
+  # ────────────────────────────────────────────────────────────
+  foundation_model:
+    provider: ibm-watsonx-ai
+    model_id: ibm/granite-3-8b-instruct
+    parameters:
+      max_new_tokens: 1024
+      temperature: 0.0        # Determinístico — respostas financeiras não toleram aleatoriedade
+      top_p: 1.0
+      repetition_penalty: 1.05
+    fallback_model_id: ibm/granite-3-2b-instruct
+
+  # ────────────────────────────────────────────────────────────
+  # Instruções de Sistema (System Prompt)
+  # ────────────────────────────────────────────────────────────
+  system_prompt: |
+    Você é o CopilotoMEI, assistente financeiro proativo do Banco do Brasil para
+    Microempreendedores Individuais (MEIs). Seu papel é:
+
+    1. MONITORAR o fluxo de caixa do MEI usando os dados retornados pela tool
+       `getDashboardState`. Nunca invente valores — use apenas os retornados pela tool.
+
+    2. ALERTAR quando saídas_semana > entradas_semana, descrevendo o déficit exato
+       em reais com o formato "R$ X.XXX,XX".
+
+    3. RECOMENDAR o plano de menor custo gerado pelo ExecutionPlan:
+       - Nível 1: resgate de reserva/poupança (custo zero).
+       - Nível 2: antecipação de recebíveis (menor taxa).
+       - Nível 3: microcrédito emergencial (somente se necessário).
+
+    4. EXECUTAR a Saga transacional apenas após receber autorização biométrica
+       explícita do usuário via tool `executeFinancialSaga`.
+
+    5. NUNCA mencionar valores monetários que não estejam no ExecutionPlan retornado
+       pelas tools. Toda resposta textual com valores em R$ é auditada pelo Guardião
+       (tool `auditModelOutput`) antes de ser exibida ao usuário.
+
+    Idioma: Português Brasileiro. Tom: direto, empático e técnico.
+    Nunca execute transações sem confirmação biométrica explícita do usuário.
+
+  # ────────────────────────────────────────────────────────────
+  # Catálogo de Skills — mapeadas do servidor MCP
+  # Importar via: openapi.yaml (operationIds abaixo)
+  # ────────────────────────────────────────────────────────────
+  skills:
+    - skill_id: "getDashboardState"
+      name: "Obter Estado Financeiro Consolidado"
+      description: >
+        Consulta o Agente 2 (Agregador Open Finance) e retorna o CanonicalFinancialState
+        completo com saldos, contas a vencer, histograma de receitas, diagnóstico de risco
+        e o ExecutionPlan calculado pelo Estrategista Financeiro.
+      operation_id: getDashboardState
+      when_to_use: >
+        Sempre que o usuário perguntar sobre saldo, contas a pagar, receitas previstas
+        ou saúde financeira geral. Invocar também em monitoramento proativo (cron).
+      required_inputs:
+        - name: mei_id
+          description: ID do MEI autenticado na sessão.
+          source: session.mei_id
+
+    - skill_id: "auditModelOutput"
+      name: "Auditar Texto Gerado (Guardrail)"
+      description: >
+        Valida que os valores monetários mencionados no texto gerado pelo modelo
+        correspondem exatamente ao ExecutionPlan calculado. Invocado automaticamente
+        antes de qualquer resposta com valores em R$ ser enviada ao usuário.
+      operation_id: auditModelOutput
+      when_to_use: >
+        Antes de qualquer resposta textual que contenha valores monetários (R$ X.XXX,XX).
+        Obrigatório — não pular este passo.
+      required_inputs:
+        - name: texto_gerado
+          description: Texto a ser auditado.
+          source: generated_response
+        - name: plano_calculado
+          description: ExecutionPlan da chamada getDashboardState mais recente.
+          source: memory.last_execution_plan
+
+    - skill_id: "executeFinancialSaga"
+      name: "Executar Saga Financeiro (Requer Biometria)"
+      description: >
+        Executa o encadeamento atômico de transações no Core BB:
+        Resgate de poupança → Antecipação de recebíveis → Liquidação de compromissos.
+        Requer token biométrico FIDO2 válido (TTL 120s) do dispositivo do usuário.
+      operation_id: executeFinancialSaga
+      when_to_use: >
+        Somente após o usuário confirmar explicitamente ("Autorizar com biometria")
+        e após a validação de guardrail ter aprovado o plano.
+      required_inputs:
+        - name: biometric_token
+          description: Token FIDO2 do dispositivo — obtido após autenticação biométrica.
+          source: auth.biometric_token
+        - name: execution_plan_id
+          description: ID do plano gerado pelo getDashboardState.
+          source: memory.execution_plan_id
+      guardrails:
+        - pre_execution: auditModelOutput
+        - require_human_approval: true
+        - approval_method: biometric_fido2
+        - token_ttl_seconds: 120
+
+    - skill_id: "validateCpfCnpjBinding"
+      name: "Validar Cadastro CPF/CNPJ (Onboarding)"
+      description: >
+        Valida vínculo entre CNPJ ativo e CPF do MEI via BrasilAPI durante o onboarding.
+        Verifica situação cadastral ativa e correspondência com o quadro societário.
+      operation_id: validateCpfCnpjBinding
+      when_to_use: >
+        Durante o cadastro (Screen_Register) quando o usuário fornece CPF e CNPJ.
+      required_inputs:
+        - name: nome_completo
+          source: user_input.nome_completo
+        - name: cpf
+          source: user_input.cpf
+        - name: cnpj
+          source: user_input.cnpj
+
+  # ────────────────────────────────────────────────────────────
+  # MCP Server — configuração de conexão
+  # ────────────────────────────────────────────────────────────
+  mcp_server:
+    transport: stdio
+    command: node
+    args:
+      - "${workspaceFolder}/src/mcp-server/build/index.js"
+    env:
+      BRASIL_API_MODE: "${env:BRASIL_API_MODE}"
+      PYTHON_BIN: "${env:PYTHON_BIN}"
+    openapi_spec: "${workspaceFolder}/openapi.yaml"
+
+  # ────────────────────────────────────────────────────────────
+  # Governança — watsonx.governance
+  # ────────────────────────────────────────────────────────────
+  governance:
+    provider: ibm-watsonx-governance
+    policies:
+      anti_hallucination:
+        enabled: true
+        strategy: "regex_monetary_extraction"
+        pattern: 'R\$\s?(\d{1,3}(\.\d{3})*,\d{2})'
+        action_on_violation: "replace_with_deterministic_template"
+
+      antifraude_boletos:
+        enabled: true
+        validate_cnpj_on: ["BOLETO_DDA"]
+        action_on_violation: "block_and_alert"
+        alert_channel: "app_notification"
+
+      human_in_the_loop:
+        enabled: true
+        required_for: ["executeFinancialSaga"]
+        method: "biometric_fido2"
+        token_ttl_seconds: 120
+
+      audit_log:
+        enabled: true
+        log_all_tool_calls: true
+        log_financial_transactions: true
+        retention_days: 2555  # 7 anos (norma BACEN)
+
+  # ────────────────────────────────────────────────────────────
+  # Watson Discovery — RAG Normativo
+  # ────────────────────────────────────────────────────────────
+  knowledge_base:
+    provider: ibm-watson-discovery
+    collections:
+      - name: "normas-mei-bb"
+        description: >
+          Manuais de crédito, contratos de adesão, tabelas tarifárias e normas do MEI
+          indexadas no Watson Discovery. Consultadas via RAG para atualização dinâmica
+          de taxas e regras sem necessidade de retreinar o modelo Granite.
+        document_types: ["pdf", "docx"]
+        auto_update: true
+
+  # ────────────────────────────────────────────────────────────
+  # Open Finance — escopos de consentimento
+  # ────────────────────────────────────────────────────────────
+  open_finance:
+    consent_scopes:
+      - BALANCES_READ
+      - TRANSACTIONS_READ
+      - RECEIVABLES_READ
+    redirect_flow: oauth2_pkce
+    supported_institutions: "all_homologated"
+
+  # ────────────────────────────────────────────────────────────
+  # Canais de entrega
+  # ────────────────────────────────────────────────────────────
+  channels:
+    - id: app_bb_mobile
+      type: mobile_app
+      bff_base_url: "http://localhost:8000/api/v1"
+    - id: whatsapp
+      type: messaging
+      provider: whatsapp_business_api
+    - id: cron_monitor
+      type: scheduled
+      schedule: "0 7 * * *"   # 07:00 diariamente — monitoramento proativo
+      trigger_skill: getDashboardState
