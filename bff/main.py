@@ -252,7 +252,10 @@ def _triagem_entrada(mensagem: str) -> str | None:
 
 
 # Valores canônicos fixos — usados para detectar alucinação numérica na saída do LLM
-_VALORES_CANONICOS = {7985.32, 7750.0, 4950.0, 2800.0, 12456.78, 1000.0, 106.96, 3200.0}
+# Valores monetários canônicos do estado de referência — usados pelo guardrail de saída
+# para detectar alucinação numérica em respostas de LLMs e do fallback local.
+# 6985.32 = disponivel (7985.32) − colchão (1000.00): reserva utilizável exibida no fallback.
+_VALORES_CANONICOS = {7985.32, 7750.0, 4950.0, 2800.0, 12456.78, 1000.0, 106.96, 3200.0, 6985.32}
 _VALOR_INVENTADO_RE = re.compile(r"R\$\s*([\d.,]+)")
 
 

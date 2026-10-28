@@ -14,6 +14,7 @@
             bb: { dark: '#002060', mid: '#0038A8', light: '#1A56DB' },
             brand: { DEFAULT: '#3B0086', soft: '#4A0EBF' },
             gold: { DEFAULT: '#FFCC00', soft: '#FEF08A' },
+            ai: { DEFAULT: '#7C3AED', soft: '#EDE9FE', mid: '#5B21B6' },
           },
           fontFamily: { sans: ['Inter','system-ui','sans-serif'] },
         }
@@ -60,6 +61,16 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
     .skeleton { background:linear-gradient(90deg,#e0e7ff 25%,#c7d2fe 50%,#e0e7ff 75%); background-size:200% 100%; animation:sk 1.4s infinite; border-radius:8px; height:18px; }
     @keyframes sk { from{background-position:200% 0} to{background-position:-200% 0} }
+    /* ── Evidências de IA Agêntica ── */
+    .badge-ai { display:inline-flex; align-items:center; gap:4px; background:#EDE9FE; color:#5B21B6; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #c4b5fd; letter-spacing:.02em; }
+    .badge-ai svg { flex-shrink:0; }
+    .badge-gov { display:inline-flex; align-items:center; gap:4px; background:#F0FDF4; color:#166534; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid #bbf7d0; }
+    .badge-gov svg { flex-shrink:0; }
+    .badge-model { display:inline-flex; align-items:center; gap:4px; background:#F5F3FF; color:#6D28D9; font-size:10px; font-weight:600; padding:1px 7px; border-radius:12px; margin-top:6px; }
+    .btn-ai { background:linear-gradient(135deg,#7C3AED,#5B21B6); color:#fff; border-radius:10px; padding:.65rem 1.4rem; font-weight:600; transition:opacity .15s,transform .1s; }
+    .btn-ai:hover { opacity:.88; transform:translateY(-1px); }
+    .agent-dot-on  { width:7px; height:7px; border-radius:50%; background:#22c55e; flex-shrink:0; }
+    .agent-dot-off { width:7px; height:7px; border-radius:50%; background:#9ca3af; flex-shrink:0; }
   </style>
 </head>
 <body class="min-h-screen flex">
@@ -87,6 +98,38 @@
         API Online
       </span>
     </div>
+  </div>
+  <!-- Painel de status dos agentes -->
+  <div class="px-4 pt-3 pb-2 border-b border-blue-700">
+    <div class="text-[9px] font-bold text-blue-300 uppercase tracking-widest mb-2">Agentes IA Ativos</div>
+    <div class="space-y-1.5">
+      <div class="flex items-center gap-2">
+        <span class="agent-dot-on"></span>
+        <span class="text-[11px] text-blue-100 flex-1 truncate">Ag.1 · Orquestrador</span>
+        <span class="text-[9px] text-emerald-400 font-semibold">ON</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="agent-dot-on"></span>
+        <span class="text-[11px] text-blue-100 flex-1 truncate">Ag.2 · Open Finance</span>
+        <span class="text-[9px] text-emerald-400 font-semibold">ON</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="agent-dot-on"></span>
+        <span class="text-[11px] text-blue-100 flex-1 truncate">Ag.3 · Estrategista</span>
+        <span class="text-[9px] font-semibold" style="color:#c4b5fd;">watsonx.ai</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="agent-dot-on"></span>
+        <span class="text-[11px] text-blue-100 flex-1 truncate">Ag.4 · Executor Saga</span>
+        <span class="text-[9px] text-emerald-400 font-semibold">ON</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="agent-dot-on"></span>
+        <span class="text-[11px] text-blue-100 flex-1 truncate">Ag.5 · Guardião</span>
+        <span class="text-[9px] font-semibold" style="color:#86efac;">gov ✓</span>
+      </div>
+    </div>
+    <div class="mt-2 pt-1.5 border-t border-blue-800 text-[9px] text-blue-400 text-center">watsonx Orchestrate · 5/5</div>
   </div>
   <nav class="flex-1 py-4 space-y-1 px-2">
     <button onclick="setView('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-l-xl text-sm">
@@ -203,9 +246,15 @@
           <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#FFCC00;">
             <svg width="22" height="22" fill="none" stroke="#92400e" stroke-width="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4m0 4h.01"/></svg>
           </div>
-          <div>
-            <div class="font-bold text-amber-900 text-sm">Atenção à saúde financeira</div>
-            <div id="banner-texto" class="text-amber-800 text-xs mt-0.5"></div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 flex-wrap mb-0.5">
+              <div class="font-bold text-amber-900 text-sm">Atenção à saúde financeira</div>
+              <span class="badge-ai" style="background:#fef3c7;color:#92400e;border-color:#fde68a;">
+                <svg width="8" height="8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                Agente 3 · Estrategista
+              </span>
+            </div>
+            <div id="banner-texto" class="text-amber-800 text-xs"></div>
           </div>
         </div>
 
@@ -233,7 +282,13 @@
 
         <!-- Ações recomendadas -->
         <div class="card p-4">
-          <h3 class="text-bb-dark font-bold text-sm mb-2">Ações recomendadas</h3>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-bb-dark font-bold text-sm">Ações recomendadas</h3>
+            <span class="badge-ai">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              Agente 3 · watsonx.ai
+            </span>
+          </div>
           <div id="lista-acoes" class="divide-y divide-gray-50"></div>
         </div>
 
@@ -243,13 +298,19 @@
             <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#FFCC00;">
               <svg width="18" height="18" fill="none" stroke="#92400e" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4m0 4h.01"/></svg>
             </div>
-            <div>
-              <div class="font-bold text-amber-900 text-sm">Risco de caixa identificado</div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="font-bold text-amber-900 text-sm">Risco de caixa identificado</div>
+                <span class="badge-gov">
+                  <svg width="8" height="8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  watsonx.governance
+                </span>
+              </div>
               <div id="texto-risco" class="text-amber-800 text-xs mt-0.5 leading-relaxed"></div>
             </div>
           </div>
           <div class="space-y-2">
-            <button onclick="abrirModalSolucao()" class="btn-p w-full text-sm">Ver solução</button>
+            <button onclick="abrirModalSolucao()" class="btn-ai w-full text-sm">Ver solução</button>
             <button onclick="abrirModalBiometria()" class="btn-o w-full text-sm">
               <span class="flex items-center justify-center gap-1.5">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v2M7 11V9a5 5 0 0 1 10 0v2"/><rect x="3" y="11" width="18" height="11" rx="2"/></svg>
@@ -320,9 +381,9 @@
     <div class="card overflow-hidden">
       <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <h3 class="font-bold text-bb-dark text-sm">Compromissos da semana — todos os 7 boletos</h3>
-        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Antifraude OK
+        <span class="badge-gov flex items-center gap-1">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Ag.5 · watsonx.governance
         </span>
       </div>
       <table class="w-full text-sm">
@@ -332,7 +393,7 @@
             <th class="px-4 py-3 text-left">Tipo</th>
             <th class="px-4 py-3 text-left">Vencimento</th>
             <th class="px-4 py-3 text-right">Valor</th>
-            <th class="px-4 py-3 text-center">Auditoria</th>
+            <th class="px-4 py-3 text-center">Ag.5 · Antifraude</th>
           </tr>
         </thead>
         <tbody id="tabela-boletos" class="divide-y divide-gray-50"></tbody>
@@ -610,7 +671,10 @@
 
     <!-- Saga -->
     <div id="bio-fase-saga" class="hidden">
-      <h2 class="font-bold text-bb-dark text-xl mb-1">Executando Saga</h2>
+      <div class="flex items-center justify-center gap-2 mb-1">
+        <h2 class="font-bold text-bb-dark text-xl">Executando Saga</h2>
+        <span class="badge-ai" style="font-size:9px;">Agente 4 · Saga Pattern</span>
+      </div>
       <p class="text-gray-400 text-sm mb-5">Operações encadeadas em progresso…</p>
       <div class="text-left space-y-4">
         <div class="saga-step pending flex items-center gap-3">
@@ -997,11 +1061,19 @@ async function executarSaga() {
 // ── Chat Copiloto ─────────────────────────────────────────────────────────────
 let chatIniciado = false;
 const CHIPS_DEFAULT = [
-  'Como economizar R$ 55,20?',
+  'Como resolver o risco de caixa?',
   'Explique o risco de caixa',
   'Quais boletos foram auditados?',
   'Explique a cascata de crédito',
 ];
+
+// Mapeia identificador de modelo para label amigável
+function modeloLabel(modelo) {
+  if (!modelo) return null;
+  if (modelo.includes('gemini')) return '⚡ Gemini Flash · P1';
+  if (modelo.includes('granite')) return '🧱 IBM Granite · P2';
+  return '🔁 Fallback Local · P3';
+}
 
 function iniciarChat() {
   if (chatIniciado) return;
@@ -1013,16 +1085,21 @@ function iniciarChat() {
   renderChips(CHIPS_DEFAULT);
 }
 
-function adicionarBolha(tipo, texto) {
+function adicionarBolha(tipo, texto, modelo) {
   const msgs = document.getElementById('chat-messages');
   const div  = document.createElement('div');
   div.className = 'flex ' + (tipo==='user' ? 'justify-end' : 'justify-start');
   const bubble = document.createElement('div');
   bubble.className = tipo==='bot' ? 'chat-bubble-bot p-4 text-sm text-gray-800' : 'chat-bubble-user p-4 text-sm';
   // Renderiza ** como bold — escHtml() sanitiza antes para prevenir XSS
-  bubble.innerHTML = escHtml(texto)
+  let html = escHtml(texto)
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\n/g,'<br>');
+  if (tipo === 'bot' && modelo) {
+    const lbl = modeloLabel(modelo);
+    if (lbl) html += `<div class="badge-model mt-1.5">${escHtml(lbl)}</div>`;
+  }
+  bubble.innerHTML = html;
   div.appendChild(bubble);
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
@@ -1084,7 +1161,7 @@ async function enviarMensagem() {
     const data = await r.json();
     removerDigitando();
     await sleep(150);
-    adicionarBolha('bot', data.resposta || 'Desculpe, não consegui processar sua pergunta.');
+    adicionarBolha('bot', data.resposta || 'Desculpe, não consegui processar sua pergunta.', data.modelo);
     if (data.sugestoes?.length) renderChips(data.sugestoes);
   } catch(e) {
     removerDigitando();

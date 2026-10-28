@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # start.sh — Inicialização Unificada do Copiloto MEI Banco do Brasil
-# Uso: ./start.sh [--no-bff] [--port 8000]
+# Uso: ./start.sh [--no-bff] [--port 8011]
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -16,12 +16,13 @@ fail()    { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
 
 # ── Parâmetros ────────────────────────────────────────────────────────────────
 START_BFF=true
-BFF_PORT=8000
+BFF_PORT=8011
+PORT_OVERRIDE=""   # guarda --port explícito para ter precedência sobre .env
 
 for arg in "$@"; do
   case $arg in
     --no-bff)  START_BFF=false ;;
-    --port)    shift; BFF_PORT="$1" ;;
+    --port)    shift; PORT_OVERRIDE="$1" ;;
   esac
 done
 
@@ -76,6 +77,9 @@ if [ -f ".env" ]; then
   success "Variáveis de ambiente carregadas de .env"
 fi
 
+# Argumento --port tem precedência sobre .env
+[ -n "$PORT_OVERRIDE" ] && BFF_PORT="$PORT_OVERRIDE"
+
 export BRASIL_API_MODE="${BRASIL_API_MODE:-mock}"
 export BFF_PORT="${BFF_PORT}"
 
@@ -94,8 +98,8 @@ else
 fi
 
 # ── 6. Suíte de testes Python ─────────────────────────────────────────────────
-info "Executando suíte de testes Python (117 testes)..."
-if "$PYTHON" -m pytest tests/ -q --tb=short 2>&1; then
+info "Executando suíte de testes Python (226 testes)..."
+if BRASIL_API_MODE=mock "$PYTHON" -m pytest tests/ -q --tb=short 2>&1; then
   success "Todos os testes passaram ✓"
 else
   fail "Falha nos testes Python. Corrija antes de iniciar o servidor."
@@ -123,14 +127,21 @@ if [ "$START_BFF" = true ]; then
   BFF_PID=$!
   echo "$BFF_PID" > logs/bff.pid
 
-  # Aguarda o servidor subir (health check na porta)
+  # Aguarda o servidor subir — health check com Python puro (sem dependência de curl)
   RETRIES=15
   info "Aguardando servidor responder na porta $BFF_PORT..."
   for i in $(seq 1 $RETRIES); do
-    if curl -sf "http://localhost:${BFF_PORT}/api/v1/dashboard/home" \
-         -H "x-mei-id: health-check" -o /dev/null 2>/dev/null; then
-      success "Servidor BFF pronto! → http://localhost:${BFF_PORT}"
-      success "Documentação Swagger → http://localhost:${BFF_PORT}/docs"
+    if "$PYTHON" -c "
+import urllib.request, sys
+try:
+    urllib.request.urlopen('http://localhost:${BFF_PORT}/api/v1/dashboard/home', timeout=2)
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; then
+      success "Servidor BFF pronto!"
+      success "  → Interface web:    http://localhost:${BFF_PORT}"
+      success "  → Documentação API: http://localhost:${BFF_PORT}/docs"
       break
     fi
     if [ "$i" -eq "$RETRIES" ]; then
@@ -146,9 +157,9 @@ echo -e "${BOLD}${GREEN}══════════════════�
 echo -e "${BOLD}${GREEN}  Ambiente iniciado com sucesso!        ${NC}"
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════${NC}"
 echo ""
-echo -e "  ${CYAN}Testes:${NC}        python3 -m pytest tests/ -v"
-echo -e "  ${CYAN}Smoke tests:${NC}   ./smoke_test.sh"
-echo -e "  ${CYAN}BFF API:${NC}       http://localhost:${BFF_PORT}"
-echo -e "  ${CYAN}Swagger UI:${NC}    http://localhost:${BFF_PORT}/docs"
-echo -e "  ${CYAN}Parar BFF:${NC}     kill \$(cat logs/bff.pid)"
+echo -e "  ${CYAN}Interface web:${NC}  http://localhost:${BFF_PORT}"
+echo -e "  ${CYAN}Swagger UI:${NC}     http://localhost:${BFF_PORT}/docs"
+echo -e "  ${CYAN}Testes:${NC}         bash run.sh --test"
+echo -e "  ${CYAN}Smoke tests:${NC}    bash run.sh --smoke"
+echo -e "  ${CYAN}Parar BFF:${NC}      kill \$(cat logs/bff.pid)"
 echo ""

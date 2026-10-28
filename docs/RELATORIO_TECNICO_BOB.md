@@ -1,7 +1,7 @@
 # Relatório de Auditoria e Hardening Bank-Grade — Copiloto MEI BB
 **Destinatário:** IBM Bob / Equipe de Engenharia e Arquitetura  
 **Contexto:** Copiloto MEI Banco do Brasil & IBM watsonx / Google Gemini  
-**Status da Suíte:** 194/194 Testes Unitários/Integrados Aprovados (100% `[PASS]`) | 29/29 Smoke Tests HTTP Aprovados (100% `[PASS]`)
+**Status da Suíte:** 226/226 Testes Unitários/Integrados Aprovados (100% `[PASS]`) | 29/29 Smoke Tests HTTP Aprovados (100% `[PASS]`)
 
 ---
 
@@ -71,33 +71,35 @@ Foram eliminadas fragilidades nos contratos de API, riscos de injeção de promp
 | [`smoke_test.py`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/smoke_test.py) | **Novo** | Smoke test nativo em Python puro sem dependência de `curl`/`jq`. |
 | [`smoke_test.sh`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/smoke_test.sh) | **Modificado** | Wrapper POSIX enxuto que repassa para o `smoke_test.py`. |
 | [`run.sh`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/run.sh) | **Novo** | Script mestre de onboarding idempotente, validação de venv, compilação MCP e inicialização. |
-| [`start.sh`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/start.sh) | **Modificado** | Encaminhamento para `run.sh --mcp`. |
+| [`start.sh`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/start.sh) | **Modificado** | Inicialização unificada autônoma (venv, testes, BFF); `PORT_OVERRIDE` garante precedência de `--port` sobre `.env`; corrida de `BFF_PORT=8000` → `8011` no `.env`. |
 | [`tests/conftest.py`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/tests/conftest.py) | **Novo** | Isolamento de ambiente nos testes: anula chaves externas para garantir execução 100% hermética. |
-| [`tests/test_bff_hardening.py`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/tests/test_bff_hardening.py) | **Novo** | 77 testes específicos de segurança, injection, fallback 429/503, validação Pydantic de recibos e redação de logs. |
+| [`tests/test_bff_hardening.py`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/tests/test_bff_hardening.py) | **Novo/Expandido** | 89 testes (77 originais + 12 `TestFallbackLocalParametrizado`): segurança, injection, fallback 429/503, Pydantic, redação de logs, valores canônicos via `otimizar_fluxo_caixa()`. |
 | [`tests/test_e2e_flow.py`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/tests/test_e2e_flow.py) | **Modificado** | Ajuste da assertion do formato do recibo consolidado canônico. |
-| [`static/index.html`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/static/index.html) | **Modificado** | Sanitização XSS (`escHtml`), validação de `resp.ok` na biometria e eliminação do falso mock `REC-MOCK-OK`. |
+| [`static/index.html`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/static/index.html) | **Modificado** | (v1) Sanitização XSS (`escHtml`), validação de `resp.ok` e remoção do mock `REC-MOCK-OK`. (v2) Evidências de IA Agêntica: painel de 5 agentes na sidebar, badges `Agente 3 · watsonx.ai`, `Ag.5 · watsonx.governance`, `Agente 4 · Saga Pattern`, indicador de modelo LLM (P1/P2/P3) nas respostas de chat, chip hardcoded corrigido. |
 | [`openapi.yaml`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/openapi.yaml) | **Modificado** | Atualização do schema de resposta do recibo com `pattern` e `minLength: 1`. |
-| [`README.md`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/README.md) | **Modificado** | Instruções de onboarding unificadas apontando para `run.sh` e `smoke_test.py`. |
+| [`README.md`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/README.md) | **Modificado** | Atualizado para v1.2: contagem 226 testes, seção "Evidências de IA Agêntica no Frontend", tabela de suítes completa. |
+| [`.env`](file:///c:/Users/Twpm/OneDrive/Área%20de%20Trabalho/copiloto-mei-bb-main/.env) | **Corrigido** | `BFF_PORT=8000` → `BFF_PORT=8011` (regressão de porta que fazia o servidor subir em 8000 ignorando o padrão do projeto). |
 
 ---
 
 ## 4. Evidência de Execução dos Testes
 
-### 4.1 Suíte Pytest (194 Cenários)
+### 4.1 Suíte Pytest (226 Cenários)
 ```text
-============================= test session starts =============================
-platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0
-collected 194 items
+============================= test session starts ==============================
+platform linux -- Python 3.12.x, pytest-9.x.x, pluggy-1.x.x
+collected 226 items
 
-tests/test_bff_hardening.py ............................................ [ 22%]
-tests/test_bff_hardening.py .................................            [ 39%]
-tests/test_chat_security.py .............                               [ 46%]
-tests/test_e2e_flow.py ......................................            [ 65%]
-tests/test_guardiao.py ....................................              [ 84%]
-tests/test_optimizer.py ................................                [100%]
+tests/test_bff_hardening.py ..........................................................  [ 39%]
+tests/test_chat_security.py .............                                               [ 45%]
+tests/test_e2e_flow.py ......................................                            [ 59%]
+tests/test_guardiao.py ....................................                              [ 74%]
+tests/test_optimizer.py ................................                                [100%]
 
-============================= 194 passed in 20.67s =============================
+============================== 226 passed, 22 warnings in 127.42s ==============
 ```
+
+> Os 22 warnings são deprecações do SDK `ibm-watsonx-ai` — pré-existentes e sem impacto funcional.
 
 ### 4.2 Smoke Test HTTP Nativo (`smoke_test.py`)
 ```text

@@ -59,9 +59,18 @@ _setup_venv() {
         python3 -m venv "$VENV_DIR"
     fi
 
-    # Ativa o venv
+    # Detecta o caminho de ativação do venv:
+    #   Linux / macOS          → .venv/bin/activate
+    #   Windows Git Bash / WSL → .venv/Scripts/activate
     # shellcheck disable=SC1091
-    source "$VENV_DIR/bin/activate"
+    if [ -f "$VENV_DIR/bin/activate" ]; then
+        source "$VENV_DIR/bin/activate"
+    elif [ -f "$VENV_DIR/Scripts/activate" ]; then
+        source "$VENV_DIR/Scripts/activate"
+    else
+        error "Não foi possível encontrar o script de ativação do venv em $VENV_DIR/bin/ ou $VENV_DIR/Scripts/."
+        exit 1
+    fi
 
     # Calcula hash do requirements.txt
     if command -v sha256sum &>/dev/null; then

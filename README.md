@@ -2,7 +2,7 @@
 
 > **IA Agêntica para Saúde Financeira de Microempreendedores Individuais**
 > Desafio IBM Experiential Learning Lab — Banco do Brasil
-> **Release Candidate v1.1 · 214 testes automatizados · Hardening Bank-Grade aplicado**
+> **Release Candidate v1.2 · 226 testes automatizados · Hardening Bank-Grade + Evidências de IA Agêntica**
 
 ---
 
@@ -175,7 +175,7 @@ Após subir o BFF: http://localhost:8011/docs
 │   └── canonical-financial-state.json  # JSON Schema draft-07 (fonte de verdade)
 ├── tests/
 │   ├── conftest.py                     # Isolamento hermético: anula chaves externas (autouse)
-│   ├── test_bff_hardening.py           # 77 testes bank-grade: segurança, guardrails, Pydantic
+│   ├── test_bff_hardening.py           # 89 testes bank-grade: segurança, guardrails, Pydantic, fallback parametrizado
 │   ├── test_chat_security.py           # 13 testes: prompt injection, fallback LLM
 │   ├── test_e2e_flow.py                # 56 testes E2E: 5 passos + BFF + bridge CLI
 │   ├── test_guardiao.py                # 24 testes: guardrail + antifraude
@@ -191,7 +191,7 @@ Após subir o BFF: http://localhost:8011/docs
 ├── run.sh                              # Script mestre: venv, testes, smoke, --watsonx, --mcp
 ├── smoke_test.py                       # Smoke tests HTTP em Python puro (sem curl/jq)
 ├── smoke_test.sh                       # Wrapper POSIX → smoke_test.py (retrocompatibilidade)
-├── start.sh                            # Wrapper → run.sh --mcp (retrocompatibilidade)
+├── start.sh                            # Inicialização unificada: venv, testes, BFF na porta 8011 (PORT_OVERRIDE > .env)
 └── .env.example                        # Template de variáveis de ambiente
 ```
 
@@ -202,10 +202,10 @@ Após subir o BFF: http://localhost:8011/docs
 ### Resultado da suíte completa
 
 ```
-======================== 214 passed, 10 warnings in 82.34s ========================
+======================== 226 passed, 22 warnings in 127.42s ========================
 ```
 
-> Os 10 warnings são deprecações do SDK `ibm-watsonx-ai` (endpoint `/ml/v1/text/generation` → `/ml/v1/text/chat`) — pré-existentes e sem impacto funcional.
+> Os 22 warnings são deprecações do SDK `ibm-watsonx-ai` (endpoints `/ml/v1/text/generation` e `/ml/v1/text/chat`) — pré-existentes e sem impacto funcional.
 
 ### Detalhamento por suíte
 
@@ -218,6 +218,7 @@ Após subir o BFF: http://localhost:8011/docs
 | **Hardening — AuthorizeBiometrics** | `test_bff_hardening.py::TestAuthorizeBiometrics` | 14 | ✅ 14/14 |
 | **Hardening — Chat** | `test_bff_hardening.py::TestChatHardening` | 15 | ✅ 15/15 |
 | **Hardening — InitProviders** | `test_bff_hardening.py::TestInitProviders` | 5 | ✅ 5/5 |
+| **Hardening — Fallback Parametrizado** | `test_bff_hardening.py::TestFallbackLocalParametrizado` | 12 | ✅ 12/12 |
 | **Segurança — Fluxo Normal** | `test_chat_security.py::TestChatNormalFlow` | 5 | ✅ 5/5 |
 | **Segurança — Prompt Injection** | `test_chat_security.py::TestChatPromptInjection` | 4 | ✅ 4/4 |
 | **Segurança — Fallback LLM** | `test_chat_security.py::TestChatApiFallback` | 4 | ✅ 4/4 |
@@ -235,7 +236,7 @@ Após subir o BFF: http://localhost:8011/docs
 | **Optimizer — Nível 2** | `test_optimizer.py::TestCenarioNivel2Antecipacao` | 8 | ✅ 8/8 |
 | **Optimizer — Nível 3** | `test_optimizer.py::TestCenarioNivel3Microcredito` | 7 | ✅ 7/7 |
 | **Optimizer — Limite** | `test_optimizer.py::TestCenarioLimiteCobertoParcialmente` | 5 | ✅ 5/5 |
-| **TOTAL** | | **214** | ✅ **214/214** |
+| **TOTAL** | | **226** | ✅ **226/226** |
 
 ---
 
@@ -321,13 +322,32 @@ Cooldown de **30 segundos** após erros 429, 503 ou timeout: tráfego desviado a
 
 ### Testes de Segurança Automatizados
 
-A suíte [`tests/test_bff_hardening.py`](tests/test_bff_hardening.py) valida automaticamente (77 testes):
+A suíte [`tests/test_bff_hardening.py`](tests/test_bff_hardening.py) valida automaticamente (89 testes):
 - Geração e validação de recibos canônicos
 - Bloqueio de jailbreak, DAN, prompt injection, exfiltração de segredos
 - Guardrail de saída: rejeição de valores monetários inventados
 - RedactingFilter: ofuscação em mensagens e args de log
 - Inicialização independente P1+P2 (sem `return` precoce)
 - Circuit breaker: cooldown e desvio de tráfego
+- Fallback local parametrizado via `otimizar_fluxo_caixa()` (12 cenários)
+
+---
+
+## Evidências de IA Agêntica no Frontend
+
+O arquivo [`static/index.html`](static/index.html) expõe visualmente onde cada agente IBM está atuando, usando uma paleta de cores dedicada (`#7C3AED` — violeta watsonx):
+
+| Componente | Agente | Indicador visual |
+|---|---|---|
+| Sidebar — painel "Agentes IA Ativos" | Ag.1–5 | Dots verdes + rótulos `watsonx.ai` (Ag.3) e `gov ✓` (Ag.5) · rodapé `watsonx Orchestrate · 5/5` |
+| Card "Ações recomendadas" | **Ag.3 · Estrategista** | Badge roxo `⚡ Agente 3 · watsonx.ai` |
+| Card "Risco de caixa" | **Ag.3 + Ag.5** | Badge verde `watsonx.governance` · botão "Ver solução" em violeta watsonx |
+| Banner de alerta financeiro | **Ag.3 · Estrategista** | Badge âmbar `Agente 3 · Estrategista` |
+| Tabela de boletos (aba Contas) | **Ag.5 · Guardião** | Header `Ag.5 · watsonx.governance` · coluna `Ag.5 · Antifraude` |
+| Modal Biometria — fase Saga | **Ag.4 · Executor** | Label inline `Agente 4 · Saga Pattern` |
+| Bolha de resposta do chat | **LLM Adapter P1/P2/P3** | Chip `⚡ Gemini Flash · P1` / `🧱 IBM Granite · P2` / `🔁 Fallback Local · P3` |
+
+> O chip de sugestão rápida `'Como economizar R$ 55,20?'` (valor hardcoded desatualizado) foi corrigido para `'Como resolver o risco de caixa?'`.
 
 ---
 
@@ -365,4 +385,4 @@ cp .env.example .env
 ---
 
 *IBM Experiential Learning Lab — Banco do Brasil × IBM*
-*Release Candidate v1.1 — 214/214 testes ✅ · Hardening Bank-Grade · Motor Cognitivo: Gemini Flash Lite (contingência autorizada) · IBM Granite ready*
+*Release Candidate v1.2 — 226/226 testes ✅ · Hardening Bank-Grade · Evidências IA Agêntica no Frontend · Motor Cognitivo: Gemini Flash Lite (contingência autorizada) · IBM Granite ready*
