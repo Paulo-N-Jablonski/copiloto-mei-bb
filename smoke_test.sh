@@ -3,7 +3,8 @@
 # smoke_test.sh — Bateria de Smoke Tests HTTP para o BFF do Copiloto MEI
 # Uso: ./smoke_test.sh [--port 8000]
 # ─────────────────────────────────────────────────────────────────────────────
-set -euo pipefail
+# Não usar set -e: os testes precisam continuar mesmo quando assertions falham
+set -uo pipefail
 
 # ── Cores ─────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -169,10 +170,8 @@ assert_json "sucesso = True" \
 RECIBO=$(python3 -c "import json,sys; d=json.load(open('/tmp/smoke_resp.json')); print(d.get('recibo_consolidado_id',''))" 2>/dev/null || echo "")
 if [[ "$RECIBO" == REC-* ]]; then
   pass "recibo_consolidado_id gerado → $RECIBO"
-  PASSED=$((PASSED+1))
 else
   fail "recibo_consolidado_id inválido → '$RECIBO'"
-  FAILED=$((FAILED+1))
 fi
 
 assert_json "antifraude aprovado = True" \
