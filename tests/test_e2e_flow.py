@@ -357,7 +357,10 @@ class TestPasso5BffSaga:
         )
         data = resp.json()
         assert data["sucesso"] is True
-        assert data["recibo_consolidado_id"].startswith("REC-ACT-2026-W43-01")
+        import re
+        assert re.fullmatch(r"^REC-[0-9A-F]{8}$", data["recibo_consolidado_id"]), (
+            f"Recibo fora do padrão canônico: {data['recibo_consolidado_id']!r}"
+        )
 
     def test_authorize_passos_executados(self):
         resp = client.post(

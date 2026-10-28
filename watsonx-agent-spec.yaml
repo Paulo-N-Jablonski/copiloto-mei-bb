@@ -213,7 +213,7 @@ agent:
   channels:
     - id: app_bb_mobile
       type: mobile_app
-      bff_base_url: "http://localhost:8000/api/v1"
+      bff_base_url: "http://localhost:8011/api/v1"
     - id: whatsapp
       type: messaging
       provider: whatsapp_business_api

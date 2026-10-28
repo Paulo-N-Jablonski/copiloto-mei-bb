@@ -978,17 +978,18 @@ async function executarSaga() {
       }).then(r=>r.json()),
     ]);
     await sleep(400);
+    if (!resp.recibo_consolidado_id) throw new Error(resp.detail || 'Resposta inválida do servidor.');
     const icoMap={RESGATE_POUPANCA:'💰',ANTECIPACAO_RECEBIVEIS:'📈',LIQUIDACAO_COMPROMISSOS:'✅'};
-    document.getElementById('recibo-id').textContent = resp.recibo_consolidado_id||'REC-MOCK-OK';
+    document.getElementById('recibo-id').textContent = resp.recibo_consolidado_id;
     document.getElementById('recibo-passos').innerHTML = (resp.passos_executados||[]).map(p=>`
       <div class="flex items-center gap-2 text-sm">
         <span>${icoMap[p.tipo]||'✔️'}</span>
-        <span class="text-gray-700 font-medium">${p.tipo.replace(/_/g,' ')}</span>
+        <span class="text-gray-700 font-medium">${escHtml(p.tipo.replace(/_/g,' '))}</span>
         <span class="ml-auto text-green-700 font-semibold">${p.valor?fmt(p.valor):''}</span>
       </div>`).join('');
     bioFase('recibo');
   } catch(e) {
-    document.getElementById('bio-erro-msg').textContent = e.message||'Erro de conexão.';
+    document.getElementById('bio-erro-msg').textContent = escHtml(e.message||'Erro de conexão.');
     bioFase('erro');
   }
 }
@@ -1018,8 +1019,8 @@ function adicionarBolha(tipo, texto) {
   div.className = 'flex ' + (tipo==='user' ? 'justify-end' : 'justify-start');
   const bubble = document.createElement('div');
   bubble.className = tipo==='bot' ? 'chat-bubble-bot p-4 text-sm text-gray-800' : 'chat-bubble-user p-4 text-sm';
-  // Renderiza ** como bold
-  bubble.innerHTML = texto
+  // Renderiza ** como bold — escHtml() sanitiza antes para prevenir XSS
+  bubble.innerHTML = escHtml(texto)
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\n/g,'<br>');
   div.appendChild(bubble);
@@ -1046,10 +1047,19 @@ function removerDigitando() {
   if (el) el.remove();
 }
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
 function renderChips(chips) {
   const area = document.getElementById('chips-area');
   area.innerHTML = chips.map(c =>
-    `<button class="chip" onclick="enviarChip('${c}')">${c}</button>`
+    `<button class="chip" onclick="enviarChip('${escHtml(c)}')">${escHtml(c)}</button>`
   ).join('');
 }
 

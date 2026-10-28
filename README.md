@@ -2,7 +2,7 @@
 
 > **IA Agêntica para Saúde Financeira de Microempreendedores Individuais**
 > Desafio IBM Experiential Learning Lab — Banco do Brasil
-> **Release Candidate v1.0 · 130 testes automatizados · Motor Cognitivo Gemini Flash Lite ativo**
+> **Release Candidate v1.1 · 214 testes automatizados · Hardening Bank-Grade aplicado**
 
 ---
 
@@ -14,7 +14,7 @@ Esta solução implementa um **Copiloto de Saúde Financeira** baseado em IA Ag�
 
 | Desafio do MEI | Resposta da Solução |
 |---|---|
-| Mistura PF/PJ e descontrole de caixa | Aggregação via Open Finance com separação automática |
+| Mistura PF/PJ e descontrole de caixa | Agregação via Open Finance com separação automática |
 | Surpresas com contas a vencer | Monitoramento proativo — alerta antes do vencimento |
 | Crédito caro como primeira opção | Cascata de menor custo: reserva → antecipação → microcrédito |
 | Boletos fraudulentos / adulterados | Guardrail antifraude com validação CNPJ em tempo real |
@@ -79,6 +79,7 @@ O endpoint de chat do BFF implementa um **LLM Adapter Pattern** com resiliência
 ├─────┼───────────────────────────────────────────────────────────┤
 │  P3 │ Motor Semântico Local (Fallback determinístico offline)   │
 │     │ Responde sem dependência de rede — sempre disponível      │
+│     │ Valores parametrizados via otimizar_fluxo_caixa()         │
 └─────┴───────────────────────────────────────────────────────────┘
 ```
 
@@ -90,46 +91,54 @@ O adaptador percorre a cadeia em ordem. Cada camada captura exceções intername
 
 ### Pré-requisitos
 
-- Python 3.10+
+- Python 3.10+ com módulo `venv` (`python3-venv`)
 - Node.js 18+ (para o servidor MCP TypeScript)
-- `curl` (para smoke tests)
+
+> **Nota:** `curl` e `jq` **não** são mais necessários. O smoke test é implementado em Python puro (`smoke_test.py`).
 
 ### 1. Inicialização completa (1 comando)
 
 ```bash
-./start.sh
+bash run.sh
 ```
 
 O script automaticamente:
-1. Cria e ativa ambiente virtual Python (`.venv/`)
-2. Instala dependências Python (`requirements.txt`) e Node.js (`package.json`)
-3. Compila o servidor MCP TypeScript
-4. Executa os 130 testes Python
-5. Inicia o BFF FastAPI em segundo plano na porta 8000
+1. Verifica a disponibilidade do módulo `python3-venv` com mensagem acionável por distro
+2. Cria e ativa ambiente virtual Python (`.venv/`)
+3. Instala dependências Python (`requirements.txt`) apenas se o hash mudou
+4. Inicia o BFF FastAPI na porta **8011**
 
-### 2. Testes unitários + integração (1 comando)
-
-```bash
-python3 -m pytest tests/ -v
-```
-
-### 3. Smoke tests de API HTTP (1 comando)
+### 2. Testes unitários + integração
 
 ```bash
-./smoke_test.sh
+bash run.sh --test
+# ou diretamente:
+BRASIL_API_MODE=mock python3 -m pytest tests/ -v
 ```
 
-> O BFF precisa estar rodando antes (`./start.sh` ou `uvicorn bff.main:app --port 8000`)
-
-### 4. Apenas o BFF (desenvolvimento)
+### 3. Smoke tests de API HTTP
 
 ```bash
-uvicorn bff.main:app --host 0.0.0.0 --port 8000 --reload
+bash run.sh --smoke
+# (o BFF precisa estar rodando: bash run.sh em outro terminal)
 ```
 
-### 5. Documentação interativa da API
+### 4. BFF com hot-reload (desenvolvimento)
 
-Após subir o BFF: http://localhost:8000/docs
+```bash
+bash run.sh --reload
+```
+
+### 5. BFF com suporte IBM watsonx.ai (P2)
+
+```bash
+bash run.sh --watsonx
+# instala ibm-watsonx-ai do requirements-watsonx.txt e inicia o BFF
+```
+
+### 6. Documentação interativa da API
+
+Após subir o BFF: http://localhost:8011/docs
 
 ---
 
@@ -138,19 +147,23 @@ Após subir o BFF: http://localhost:8000/docs
 ```
 .
 ├── agents/
-│   ├── cli_bridge.py               # Ponte CLI Python ↔ MCP TypeScript
+│   ├── identificadores.py              # Gerador canônico REC-XXXXXXXX (UUID4, bank-grade)
+│   ├── cli_bridge.py                   # Ponte CLI Python ↔ MCP TypeScript
 │   ├── estrategista/
-│   │   ├── models.py               # Modelos Pydantic (CanonicalFinancialState, ExecutionPlan)
-│   │   └── optimizer.py            # Motor de otimização: projeção P(d) + cascata 3 níveis
+│   │   ├── models.py                   # Modelos Pydantic (CanonicalFinancialState, ExecutionPlan)
+│   │   └── optimizer.py                # Motor de otimização: projeção P(d) + cascata 3 níveis
 │   └── guardiao/
-│       ├── antifraude.py           # Validação CNPJ via BrasilAPI (mock|real)
-│       └── guardrail.py            # Anti-alucinação numérica (regex + template determinístico)
+│       ├── antifraude.py               # Validação CNPJ via BrasilAPI (mock|real)
+│       └── guardrail.py                # Anti-alucinação numérica (regex + template determinístico)
 ├── bff/
-│   └── main.py                     # FastAPI BFF: /dashboard/home, /copiloto/summary, /authorize
+│   └── main.py                         # FastAPI BFF: /dashboard/home, /copiloto/summary,
+│                                       #   /authorize-biometrics, /chat
+│                                       #   Inclui: _RedactingFilter, guardrails P0/saída,
+│                                       #   LLM Adapter P1→P2→P3, circuit breaker Gemini
 ├── src/mcp-server/
 │   ├── src/
-│   │   ├── index.ts                # Entrypoint stdio MCP
-│   │   ├── python-bridge.ts        # Invocação do bridge Python via spawn
+│   │   ├── index.ts                    # Entrypoint stdio MCP
+│   │   ├── python-bridge.ts            # Invocação do bridge Python via spawn
 │   │   └── tools/
 │   │       ├── get-dashboard-state.ts
 │   │       ├── execute-saga.ts
@@ -159,23 +172,27 @@ Após subir o BFF: http://localhost:8000/docs
 │   ├── package.json
 │   └── tsconfig.json
 ├── schemas/
-│   └── canonical-financial-state.json   # JSON Schema draft-07 (fonte de verdade)
+│   └── canonical-financial-state.json  # JSON Schema draft-07 (fonte de verdade)
 ├── tests/
-│   ├── test_optimizer.py           # 61 testes unitários (5 cenários da cascata)
-│   ├── test_guardiao.py            # 24 testes (guardrail + antifraude)
-│   ├── test_e2e_flow.py            # 56 testes E2E (5 passos + BFF + bridge CLI)
-│   └── test_chat_security.py       # 13 testes de segurança (prompt injection + fallback)
+│   ├── conftest.py                     # Isolamento hermético: anula chaves externas (autouse)
+│   ├── test_bff_hardening.py           # 77 testes bank-grade: segurança, guardrails, Pydantic
+│   ├── test_chat_security.py           # 13 testes: prompt injection, fallback LLM
+│   ├── test_e2e_flow.py                # 56 testes E2E: 5 passos + BFF + bridge CLI
+│   ├── test_guardiao.py                # 24 testes: guardrail + antifraude
+│   └── test_optimizer.py               # 44 testes unitários: 5 cenários da cascata
 ├── docs/
-│   ├── arquiteturaTecnica.md       # Spec completa: OpenAPI, schemas, algoritmos, Saga
-│   ├── contextoNegocioBB.md        # Contexto de negócio e casos de uso MEI
-│   ├── telaInicio.jpeg             # Tela de referência Screen_Dashboard
-│   └── telaCopiloto.jpeg           # Tela de referência Screen_CopilotoMEI
-├── openapi.yaml                    # Especificação OpenAPI 3.0.3 das 4 tools
-├── watsonx-agent-spec.yaml         # Manifesto Skills watsonx Orchestrate
-├── requirements.txt                # Dependências Python
-├── .env.example                    # Variáveis de ambiente (template)
-├── start.sh                        # Inicialização unificada
-└── smoke_test.sh                   # Smoke tests HTTP com PASS/FAIL colorido
+│   ├── RELATORIO_TECNICO_BOB.md        # Auditoria bank-grade: diagnóstico, correções, next steps
+│   ├── arquiteturaTecnica.md           # Spec completa: OpenAPI, schemas, algoritmos, Saga
+│   └── contextoNegocioBB.md            # Contexto de negócio e casos de uso MEI
+├── openapi.yaml                        # Especificação OpenAPI 3.0.3 das 4 tools MCP
+├── watsonx-agent-spec.yaml             # Manifesto Skills watsonx Orchestrate
+├── requirements.txt                    # Dependências Python (completo)
+├── requirements-watsonx.txt            # Dependências opcionais IBM watsonx.ai SDK
+├── run.sh                              # Script mestre: venv, testes, smoke, --watsonx, --mcp
+├── smoke_test.py                       # Smoke tests HTTP em Python puro (sem curl/jq)
+├── smoke_test.sh                       # Wrapper POSIX → smoke_test.py (retrocompatibilidade)
+├── start.sh                            # Wrapper → run.sh --mcp (retrocompatibilidade)
+└── .env.example                        # Template de variáveis de ambiente
 ```
 
 ---
@@ -185,31 +202,40 @@ Após subir o BFF: http://localhost:8000/docs
 ### Resultado da suíte completa
 
 ```
-======================== 130 passed, 1 warning in 27.88s ========================
+======================== 214 passed, 10 warnings in 82.34s ========================
 ```
+
+> Os 10 warnings são deprecações do SDK `ibm-watsonx-ai` (endpoint `/ml/v1/text/generation` → `/ml/v1/text/chat`) — pré-existentes e sem impacto funcional.
 
 ### Detalhamento por suíte
 
 | Suíte | Arquivo | Testes | Resultado |
 |---|---|---|---|
+| **Hardening — Identificadores** | `test_bff_hardening.py::TestIdentificadores` | 13 | ✅ 13/13 |
+| **Hardening — Triagem Entrada** | `test_bff_hardening.py::TestTriagemEntrada` | 12 | ✅ 12/12 |
+| **Hardening — Validar Saída LLM** | `test_bff_hardening.py::TestValidarSaidaLLM` | 10 | ✅ 10/10 |
+| **Hardening — RedactingFilter** | `test_bff_hardening.py::TestRedactingFilter` | 8 | ✅ 8/8 |
+| **Hardening — AuthorizeBiometrics** | `test_bff_hardening.py::TestAuthorizeBiometrics` | 14 | ✅ 14/14 |
+| **Hardening — Chat** | `test_bff_hardening.py::TestChatHardening` | 15 | ✅ 15/15 |
+| **Hardening — InitProviders** | `test_bff_hardening.py::TestInitProviders` | 5 | ✅ 5/5 |
+| **Segurança — Fluxo Normal** | `test_chat_security.py::TestChatNormalFlow` | 5 | ✅ 5/5 |
+| **Segurança — Prompt Injection** | `test_chat_security.py::TestChatPromptInjection` | 4 | ✅ 4/4 |
+| **Segurança — Fallback LLM** | `test_chat_security.py::TestChatApiFallback` | 4 | ✅ 4/4 |
 | **E2E — Passo 1** | `test_e2e_flow.py::TestPasso1AggregadorEstado` | 7 | ✅ 7/7 |
 | **E2E — Passo 2** | `test_e2e_flow.py::TestPasso2EstrategistaPlan` | 9 | ✅ 9/9 |
 | **E2E — Passo 3** | `test_e2e_flow.py::TestPasso3Antifraude` | 4 | ✅ 4/4 |
 | **E2E — Passo 4** | `test_e2e_flow.py::TestPasso4Guardrail` | 4 | ✅ 4/4 |
 | **E2E — BFF + Saga** | `test_e2e_flow.py::TestPasso5BffSaga` | 25 | ✅ 25/25 |
 | **E2E — Bridge CLI** | `test_e2e_flow.py::TestBridgeCLI` | 7 | ✅ 7/7 |
-| **Guardião** | `test_guardiao.py::TestExtracao` | 9 | ✅ 9/9 |
-| **Guardião** | `test_guardiao.py::TestAuditoriaTexto` | 7 | ✅ 7/7 |
-| **Guardião** | `test_guardiao.py::TestAntifraudeMock` | 8 | ✅ 8/8 |
-| **Optimizer — Telas** | `test_optimizer.py::TestCenarioRealTelaReferencia` | 11 | ✅ 11/11 |
+| **Guardião — Extração** | `test_guardiao.py::TestExtracao` | 9 | ✅ 9/9 |
+| **Guardião — Auditoria Texto** | `test_guardiao.py::TestAuditoriaTexto` | 7 | ✅ 7/7 |
+| **Guardião — Antifraude Mock** | `test_guardiao.py::TestAntifraudeMock` | 8 | ✅ 8/8 |
+| **Optimizer — Telas Referência** | `test_optimizer.py::TestCenarioRealTelaReferencia` | 11 | ✅ 11/11 |
 | **Optimizer — Nível 1** | `test_optimizer.py::TestCenarioNivel1Reserva` | 6 | ✅ 6/6 |
 | **Optimizer — Nível 2** | `test_optimizer.py::TestCenarioNivel2Antecipacao` | 8 | ✅ 8/8 |
 | **Optimizer — Nível 3** | `test_optimizer.py::TestCenarioNivel3Microcredito` | 7 | ✅ 7/7 |
 | **Optimizer — Limite** | `test_optimizer.py::TestCenarioLimiteCobertoParcialmente` | 5 | ✅ 5/5 |
-| **Segurança — Fluxo Normal** | `test_chat_security.py::TestChatNormalFlow` | 5 | ✅ 5/5 |
-| **Segurança — Prompt Injection** | `test_chat_security.py::TestChatPromptInjection` | 4 | ✅ 4/4 |
-| **Segurança — Fallback LLM** | `test_chat_security.py::TestChatApiFallback` | 4 | ✅ 4/4 |
-| **TOTAL** | | **130** | ✅ **130/130** |
+| **TOTAL** | | **214** | ✅ **214/214** |
 
 ---
 
@@ -231,7 +257,7 @@ Após subir o BFF: http://localhost:8000/docs
 | `GET /api/v1/dashboard/home` | Screen_Dashboard | Saldos, contas a vencer, histograma 7d, alerta déficit |
 | `GET /api/v1/copiloto/summary` | Screen_CopilotoMEI | Ações recomendadas, card risco, capacidades do Copiloto |
 | `POST /api/v1/copiloto/authorize-biometrics` | Autorização 1-clique | Antifraude + guardrail + recibo Saga consolidado |
-| `POST /api/v1/copiloto/chat` | Screen_CopilotoMEI (Chat) | Motor cognitivo dinâmico com LLM Adapter (P1→P2→P3); injeção de contexto canônico e fallback resiliente |
+| `POST /api/v1/copiloto/chat` | Screen_CopilotoMEI (Chat) | Motor cognitivo dinâmico com LLM Adapter (P1→P2→P3); contexto canônico injetado; fallback resiliente |
 
 ### Fluxo de integração
 
@@ -272,39 +298,36 @@ G > 0?
 
 ## Segurança, Governança e Hardening
 
-### Defesa contra Prompt Injection
+Auditoria completa documentada em [`docs/RELATORIO_TECNICO_BOB.md`](docs/RELATORIO_TECNICO_BOB.md).
 
-O `_GEMINI_SYSTEM_PROMPT` injetado em todas as chamadas ao LLM contém uma **Boundary Restriction** explícita: o modelo é instruído a recusar educadamente qualquer interação fora do escopo de finanças, negócios e tecnologia do BB, mesmo sob tentativas de jailbreak ou redirecionamento de instrução.
+### Defesa em Profundidade — 4 camadas
 
-```
-"REGRA DE SEGURANÇA — BOUNDARY RESTRICTION: Você é estritamente um assistente
-financeiro do Banco do Brasil. Se o usuário fizer perguntas fora do escopo de
-finanças, negócios, gestão ou tecnologia do BB, RECUSE educadamente."
-```
+| Camada | Mecanismo | Onde |
+|---|---|---|
+| **P0 — Triagem** | `_triagem_entrada()`: bloqueia jailbreak, DAN, exfiltração antes do LLM | `bff/main.py` |
+| **P1 — Anti-alucinação** | `_validar_saida_llm()`: rejeita valores monetários não canônicos na saída | `bff/main.py` |
+| **P2 — Antifraude** | Validação CNPJ de todos os boletos DDA via BrasilAPI antes da Saga | `agents/guardiao/antifraude.py` |
+| **P3 — Recibo** | ID canônico `REC-[0-9A-F]{8}` com entropia UUID4 no servidor | `agents/identificadores.py` |
 
-### Fidelidade Numérica
+### Proteção de Credenciais
 
-O modelo é travado via System Prompt para utilizar **estritamente os valores do contexto canônico** injetado (Saldo: R$ 7.985,32, Déficit: R$ 2.800,00), impedindo alucinações numéricas antes do disparo da Saga.
+- **`_RedactingFilter`** ativo em todos os loggers: ofusca padrões `AIza...`, `Bearer`, `x-goog-api-key`, `WATSONX_API_KEY` antes de qualquer handler de log registrar a mensagem.
+- Exceções de provedores externos registram apenas `type(exc).__name__` — nunca payloads ou tracebacks com tokens.
+- `load_dotenv(override=False)`: segredos injetados por CI/CD (K8s Secrets, Vault) nunca são sobrescritos por `.env` locais.
 
-```
-"REGRA DE FIDELIDADE NUMÉRICA: Você não tem autoridade para aprovar crédito,
-alterar saldos ou prometer taxas. Não invente números."
-```
+### Circuit Breaker Gemini
 
-### Ocultação de Stack Trace e API Keys
-
-Todos os blocos `try/except` nas chamadas LLM (P1 Gemini e P2 IBM Granite) registram apenas `type(exc).__name__` nos logs internos — nunca `str(exc)`. Isso garante que mensagens de erro contendo API keys, URLs ou tokens **jamais apareçam no payload HTTP** retornado ao frontend, mesmo em cenários de HTTP 429, 503 ou timeout.
-
-### Proteção do `.env`
-
-O arquivo `.gitignore` lista explicitamente `.env` e `*.env`, protegendo todas as credenciais de commits acidentais.
+Cooldown de **30 segundos** após erros 429, 503 ou timeout: tráfego desviado automaticamente para IBM Granite (P2) ou fallback local (P3) sem penalizar o usuário.
 
 ### Testes de Segurança Automatizados
 
-A suíte [`tests/test_chat_security.py`](tests/test_chat_security.py) valida automaticamente:
-- Fluxo normal retorna HTTP 200 com schema correto
-- Tentativas de prompt injection retornam resposta segura sem vazar credenciais
-- Falha simulada do LLM externo garante HTTP 200 via fallback local
+A suíte [`tests/test_bff_hardening.py`](tests/test_bff_hardening.py) valida automaticamente (77 testes):
+- Geração e validação de recibos canônicos
+- Bloqueio de jailbreak, DAN, prompt injection, exfiltração de segredos
+- Guardrail de saída: rejeição de valores monetários inventados
+- RedactingFilter: ofuscação em mensagens e args de log
+- Inicialização independente P1+P2 (sem `return` precoce)
+- Circuit breaker: cooldown e desvio de tráfego
 
 ---
 
@@ -318,7 +341,7 @@ cp .env.example .env
 
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `BFF_PORT` | `8000` | Porta do servidor BFF FastAPI |
+| `BFF_PORT` | `8011` | Porta do servidor BFF FastAPI |
 | `BRASIL_API_MODE` | `mock` | `mock` (sem rede) ou `real` (BrasilAPI) |
 | `LOG_LEVEL` | `info` | Nível de log uvicorn |
 | `PYTHON_BIN` | `python3` | Binário Python para bridge MCP |
@@ -326,12 +349,13 @@ cp .env.example .env
 | `WATSONX_API_KEY` | — | API key IBM watsonx — LLM Adapter P2 (Granite) |
 | `WATSONX_URL` | `https://us-south.ml.cloud.ibm.com` | Endpoint regional watsonx.ai |
 | `WATSONX_PROJECT_ID` | — | Project ID watsonx.ai |
-| `WATSONX_MODEL_ID` | `meta-llama/llama-3-3-70b-instruct` | Modelo IBM (fallback automático para Granite quando disponível) |
+| `WATSONX_MODEL_ID` | `meta-llama/llama-3-3-70b-instruct` | Modelo IBM (Granite quando disponível) |
 
 ---
 
 ## Referências
 
+- [`docs/RELATORIO_TECNICO_BOB.md`](docs/RELATORIO_TECNICO_BOB.md) — Auditoria bank-grade: diagnóstico, vulnerabilidades saneadas, evidências de testes, next steps
 - [`docs/arquiteturaTecnica.md`](docs/arquiteturaTecnica.md) — Topologia multiagente, schemas JSON, contratos OpenAPI, protocolo Saga
 - [`docs/contextoNegocioBB.md`](docs/contextoNegocioBB.md) — Contexto de negócio, casos de uso MEI, Open Finance
 - [`openapi.yaml`](openapi.yaml) — Especificação OpenAPI 3.0.3 completa
@@ -340,13 +364,5 @@ cp .env.example .env
 
 ---
 
-## Referências Técnicas Adicionais
-
-- [`tests/test_chat_security.py`](tests/test_chat_security.py) — Suíte de segurança: prompt injection, fallback LLM, ocultação de stack trace
-- [`docs/relatorio_tecnico_mentor.md`](docs/relatorio_tecnico_mentor.md) — Relatório técnico enviado à mentoria IBM sobre credenciais watsonx
-- [`bff/main.py`](bff/main.py) — LLM Adapter Pattern, System Prompt com guardrails, cascata P1→P2→P3
-
----
-
 *IBM Experiential Learning Lab — Banco do Brasil × IBM*
-*Release Candidate v1.0 — Motor Cognitivo: Google Gemini Flash Lite (contingência autorizada) · Fallback: IBM Granite ready · 130/130 testes ✅*
+*Release Candidate v1.1 — 214/214 testes ✅ · Hardening Bank-Grade · Motor Cognitivo: Gemini Flash Lite (contingência autorizada) · IBM Granite ready*

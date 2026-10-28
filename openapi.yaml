@@ -207,7 +207,95 @@ paths:
 components:
   schemas:
     CanonicalFinancialState:
-      $ref: './schemas/canonical-financial-state.json'
+      # Definição inline do CanonicalFinancialState — garante resolução correta
+      # em qualquer contexto (IBM API Connect, Swagger Editor, Postman, watsonx Orchestrate)
+      # sem depender de $ref com caminho relativo ao sistema de arquivos local.
+      # Fonte de verdade completa: schemas/canonical-financial-state.json (JSON Schema draft-07)
+      type: object
+      required:
+        - mei_id
+        - resumo_saldos
+        - a_vencer_semana
+        - receita_prevista_7d
+        - diagnostico_risco
+      properties:
+        mei_id:
+          type: string
+          description: Identificador único do MEI no sistema BB.
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        resumo_saldos:
+          type: object
+          required: [saldo_atual, contas_conectadas, disponivel]
+          properties:
+            saldo_atual:
+              type: number
+              example: 12456.78
+            contas_conectadas:
+              type: integer
+              example: 3
+            disponivel:
+              type: number
+              example: 7985.32
+        a_vencer_semana:
+          type: object
+          required: [total, itens]
+          properties:
+            total:
+              type: number
+              example: 7750.00
+            itens:
+              type: array
+              items:
+                type: object
+                required: [id, descricao, valor, dias_para_vencimento, cnpj_beneficiario, tipo]
+                properties:
+                  id:
+                    type: string
+                  descricao:
+                    type: string
+                  valor:
+                    type: number
+                  dias_para_vencimento:
+                    type: integer
+                  cnpj_beneficiario:
+                    type: string
+                    pattern: '^\d{14}$'
+                  tipo:
+                    type: string
+                    enum: [CARTAO, BOLETO_DDA, DAS_MEI, CONTA_CONSUMO]
+        receita_prevista_7d:
+          type: object
+          required: [total, histograma]
+          properties:
+            total:
+              type: number
+              example: 4950.00
+            histograma:
+              type: array
+              minItems: 7
+              maxItems: 7
+              items:
+                type: object
+                required: [dia_rotulo, valor]
+                properties:
+                  dia_rotulo:
+                    type: string
+                    enum: [Hoje, Sexta, Sábado, Domingo, Segunda, Terça, Quarta]
+                  valor:
+                    type: number
+        diagnostico_risco:
+          type: object
+          required: [risco_identificado, defice_semana, acao_recomendada_id]
+          properties:
+            risco_identificado:
+              type: boolean
+              example: true
+            defice_semana:
+              type: number
+              example: 2800.00
+            acao_recomendada_id:
+              type: string
+              example: "ACT-2026-W43-01"
 
     ValidacaoCpfCnpjResponse:
       type: object
@@ -256,8 +344,12 @@ components:
           example: true
         recibo_consolidado_id:
           type: string
-          description: Identificador único do recibo consolidado emitido após execução bem-sucedida de todos os passos.
-          example: "REC-2026-W43-001"
+          minLength: 1
+          pattern: "^REC-[0-9A-F]{8}$"
+          description: >
+            Identificador canônico do recibo consolidado gerado no servidor com entropia UUID4.
+            Formato: REC- seguido de 8 dígitos hexadecimais maiúsculos.
+          example: "REC-2898A06A"
 
     ErrorResponse:
       type: object

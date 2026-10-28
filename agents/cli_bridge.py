@@ -29,49 +29,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.estrategista.optimizer import otimizar_fluxo_caixa
 from agents.guardiao.antifraude import auditar_boletos, validar_cnpj
 from agents.guardiao.guardrail import auditar_texto
+from agents.state import CANONICAL_STATE
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Payload canônico de referência (stub Agente 2 — substitui chamada Open Finance)
-# Valores exatos das telas de referência: docs/telaInicio.jpeg e docs/telaCopiloto.jpeg
-# ──────────────────────────────────────────────────────────────────────────────
-
-CANONICAL_STATE_STUB = {
-    "mei_id": "",  # preenchido dinamicamente com o mei_id recebido
-    "resumo_saldos": {
-        "saldo_atual": 12456.78,
-        "contas_conectadas": 3,
-        "disponivel": 7985.32,
-    },
-    "a_vencer_semana": {
-        "total": 7750.0,
-        "itens": [
-            {"id": "COMP-001", "descricao": "cartão de crédito",    "valor": 1250.0, "dias_para_vencimento": 3, "cnpj_beneficiario": "11222333000181", "tipo": "CARTAO"},
-            {"id": "COMP-002", "descricao": "aluguel",              "valor": 1800.0, "dias_para_vencimento": 5, "cnpj_beneficiario": "22333444000192", "tipo": "BOLETO_DDA"},
-            {"id": "COMP-003", "descricao": "conta de energia",     "valor": 650.0,  "dias_para_vencimento": 6, "cnpj_beneficiario": "33444555000103", "tipo": "CONTA_CONSUMO"},
-            {"id": "COMP-004", "descricao": "DAS-MEI",              "valor": 75.9,   "dias_para_vencimento": 7, "cnpj_beneficiario": "00394460034273", "tipo": "DAS_MEI"},
-            {"id": "COMP-005", "descricao": "fornecedor papelaria", "valor": 890.0,  "dias_para_vencimento": 4, "cnpj_beneficiario": "44555666000114", "tipo": "BOLETO_DDA"},
-            {"id": "COMP-006", "descricao": "plano de saúde",       "valor": 534.1,  "dias_para_vencimento": 2, "cnpj_beneficiario": "55666777000125", "tipo": "BOLETO_DDA"},
-            {"id": "COMP-007", "descricao": "internet empresarial", "valor": 2550.0, "dias_para_vencimento": 1, "cnpj_beneficiario": "66777888000136", "tipo": "CONTA_CONSUMO"},
-        ],
-    },
-    "receita_prevista_7d": {
-        "total": 4950.0,
-        "histograma": [
-            {"dia_rotulo": "Hoje",    "valor": 900.0},
-            {"dia_rotulo": "Sexta",   "valor": 1200.0},
-            {"dia_rotulo": "Sábado",  "valor": 1100.0},
-            {"dia_rotulo": "Domingo", "valor": 0.0},
-            {"dia_rotulo": "Segunda", "valor": 400.0},
-            {"dia_rotulo": "Terça",   "valor": 500.0},
-            {"dia_rotulo": "Quarta",  "valor": 850.0},
-        ],
-    },
-    "diagnostico_risco": {
-        "risco_identificado": True,
-        "defice_semana": 2800.0,  # 7750 - 4950
-        "acao_recomendada_id": "ACT-2026-W43-01",
-    },
-}
+# Alias de retrocompatibilidade — mantém o nome CANONICAL_STATE_STUB usado
+# internamente neste módulo sem duplicar os dados.
+# Fonte única de verdade: agents/state.py
+CANONICAL_STATE_STUB = CANONICAL_STATE
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -129,9 +92,9 @@ def _handle_execute_saga(payload: dict) -> dict:
                 f"Guardrail rejeitou o texto gerado. Divergências: {gr.divergencias}"
             )
 
-    # Simula execução dos passos Saga
-    import time
-    recibo_id = f"REC-{execution_plan_id}-{int(time.time())}"
+    # Simula execução dos passos Saga — ID canônico gerado no servidor
+    from agents.identificadores import gerar_recibo_id
+    recibo_id = gerar_recibo_id()
     passos = [
         {"passo": 1, "tipo": "RESGATE_POUPANCA",       "status": "CONCLUIDO", "valor": next((a["valor"] for a in plano["acoes"] if a.get("tipo") == "RESGATE_POUPANCA"), 0.0)},
         {"passo": 2, "tipo": "ANTECIPACAO_RECEBIVEIS", "status": "CONCLUIDO", "valor": next((a.get("valor_liquido", 0.0) for a in plano["acoes"] if a.get("tipo") == "ANTECIPACAO_RECEBIVEIS"), 0.0)},

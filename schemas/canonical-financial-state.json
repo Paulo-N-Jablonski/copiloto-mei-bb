@@ -150,9 +150,9 @@
         },
         "defice_semana": {
           "type": "number",
-          "description": "Valor absoluto do déficit semanal. Calculado como max(0, a_vencer_semana.total - receita_prevista_7d.total). Exibido no alerta: 'R$ 2.150,00 na próxima semana'.",
+          "description": "Valor absoluto do déficit semanal. Calculado como max(0, a_vencer_semana.total - receita_prevista_7d.total). Exemplo canônico: R$ 7.750,00 − R$ 4.950,00 = R$ 2.800,00.",
           "minimum": 0,
-          "example": 2150.00
+          "example": 2800.00
         },
         "acao_recomendada_id": {
           "type": "string",

@@ -1,0 +1,16 @@
+# requirements-watsonx.txt — Dependências opcionais do IBM watsonx.ai SDK
+#
+# Instale APENAS em ambientes com integração real ao IBM watsonx.ai (P2):
+#
+#   bash run.sh --watsonx          # instala e inicia o BFF com suporte watsonx
+#   pip install -r requirements-watsonx.txt   # instalação manual
+#
+# Referência: docs/RELATORIO_TECNICO_BOB.md §5 item 2 (Separação Opcional de Dependências)
+#
+# Nota: o requirements.txt principal já inclui ibm-watsonx-ai para ambientes completos.
+# Este arquivo destina-se a pipelines leves (BFF-only) onde o footprint importa:
+#   - Containers distroless / imagens slim
+#   - Ambientes de teste unitário sem credenciais watsonx reais
+#   - Builds de CI/CD otimizados por camada de cache Docker
+
+ibm-watsonx-ai>=1.0.0
